@@ -1,0 +1,2589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KhmerSub AI — Audio & SRT to Khmer Subtitles</title>
+<meta name="description" content="Turn any audio/video into Khmer subtitles, or translate any SRT/VTT into Khmer. Pure HTML — no install, no server." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #06060f;
+    --card: rgba(255,255,255,0.04);
+    --card-2: rgba(255,255,255,0.07);
+    --border: rgba(255,255,255,0.10);
+    --border-2: rgba(255,255,255,0.18);
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #a855f7;
+    --accent-2: #06b6d4;
+    --accent-3: #ec4899;
+    --success: #10b981;
+    --warn: #f59e0b;
+    --danger: #f43f5e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { color-scheme: dark; scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  .font-khmer { font-family: 'Kantumruy Pro', sans-serif; }
+  code, pre { font-family: 'JetBrains Mono', monospace; }
+
+  /* Backgrounds */
+  .bg-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .bg-aurora::before, .bg-aurora::after {
+    content: ''; position: absolute; width: 60vmax; height: 60vmax;
+    border-radius: 50%; filter: blur(110px); opacity: 0.35;
+    animation: float 22s ease-in-out infinite alternate;
+  }
+  .bg-aurora::before { background: radial-gradient(circle, #8b5cf6, transparent 65%); top: -20vmax; left: -15vmax; }
+  .bg-aurora::after { background: radial-gradient(circle, #06b6d4, transparent 65%); bottom: -25vmax; right: -15vmax; animation-delay: -8s; }
+  .bg-grid {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+  @keyframes float {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(8vmax, 6vmax) scale(1.15); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6); }
+    100% { box-shadow: 0 0 0 18px rgba(244, 63, 94, 0); }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-shimmer {
+    background-image: linear-gradient(90deg, #a855f7, #6366f1, #06b6d4, #a855f7);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s linear infinite;
+  }
+  .pulse-ring { animation: pulse-ring 1.4s ease-out infinite; }
+  .spinner {
+    display: inline-block;
+    width: 1em; height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: -0.15em;
+  }
+
+  /* Layout */
+  .app { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+  .brand { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; background: none; border: 0; color: inherit; padding: 0; }
+  .brand-logo {
+    width: 44px; height: 44px;
+    border-radius: 14px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6, #06b6d4);
+    font-family: 'Kantumruy Pro';
+    font-weight: 700; font-size: 22px; color: white;
+    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+  }
+  .brand-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+  .brand-name .grad {
+    background: linear-gradient(90deg, #ec4899, #06b6d4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .brand-sub { font-family: 'Kantumruy Pro'; font-size: 11px; color: var(--text-faint); }
+  .brand-badges { display: none; gap: 0.5rem; }
+  @media (min-width: 640px) { .brand-badges { display: flex; } }
+
+  /* Share button */
+  .share-btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(236, 72, 153, 0.2), rgba(6, 182, 212, 0.2));
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: white;
+    font-family: inherit;
+    font-size: 0.875rem; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.25);
+  }
+  .share-btn:hover {
+    background: linear-gradient(90deg, rgba(236, 72, 153, 0.35), rgba(6, 182, 212, 0.35));
+    border-color: rgba(168, 85, 247, 0.7);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+  }
+  .share-btn.copied {
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.25));
+    border-color: rgba(16, 185, 129, 0.5);
+  }
+  .share-icon { font-size: 1rem; }
+  .share-label { display: none; }
+  @media (min-width: 480px) { .share-label { display: inline; } }
+
+  /* Tabs */
+  .tabs { display: flex; justify-content: center; margin-bottom: 1.5rem; }
+  .tabs-inner {
+    display: inline-flex; gap: 0.25rem;
+    padding: 0.375rem;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  .tab {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-radius: 12px;
+    font-size: 0.875rem; font-weight: 600;
+    background: none; border: 0; color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: white; background: rgba(255,255,255,0.05); }
+  .tab.active {
+    background: linear-gradient(90deg, rgba(236, 72, 153, 0.9), rgba(139, 92, 246, 0.9));
+    color: white;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+  }
+  .tab-kh { display: none; font-family: 'Kantumruy Pro'; font-size: 0.75rem; opacity: 0.7; }
+  @media (min-width: 768px) { .tab-kh { display: inline; } }
+
+  /* Hero */
+  .hero { text-align: center; margin-bottom: 2rem; }
+  .hero .badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 1rem; border-radius: 999px;
+    background: rgba(168, 85, 247, 0.12);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: #d8b4fe;
+    font-size: 0.75rem; font-weight: 500;
+    margin-bottom: 1.25rem;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin: 0 0 1rem;
+    color: white;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: var(--text-dim); font-size: 1rem; max-width: 640px; margin: 0 auto 0.5rem; }
+  .hero .kh { font-family: 'Kantumruy Pro'; color: var(--text-faint); font-size: 0.95rem; }
+
+  /* Card */
+  .card {
+    border-radius: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    padding: 1.5rem;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.5);
+  }
+  .card-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    color: white;
+    box-shadow: 0 8px 24px -6px currentColor;
+  }
+  .card-icon.pink { background: linear-gradient(135deg, #ec4899, #8b5cf6); }
+  .card-icon.cyan { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+  .card-icon.amber { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+  .card h2 { margin: 0; font-size: 1.125rem; font-weight: 700; color: white; }
+  .card .sub { font-family: 'Kantumruy Pro'; font-size: 0.875rem; color: var(--text-dim); }
+
+  /* Grid */
+  .grid-2 { display: grid; gap: 1.5rem; }
+  @media (min-width: 1024px) { .grid-2 { grid-template-columns: 1.1fr 0.9fr; } }
+
+  /* Dropzone */
+  .dropzone {
+    position: relative;
+    border: 2px dashed var(--border-2);
+    border-radius: 16px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.02);
+  }
+  .dropzone:hover { border-color: rgba(168, 85, 247, 0.5); background: rgba(255,255,255,0.04); }
+  .dropzone.over { border-color: var(--accent); background: rgba(168, 85, 247, 0.1); transform: scale(1.01); }
+  .dropzone-icon {
+    width: 64px; height: 64px;
+    margin: 0 auto 0.75rem;
+    border-radius: 16px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(6, 182, 212, 0.2));
+    color: #ddd6fe;
+    border: 1px solid var(--border-2);
+  }
+  .dropzone-title { font-weight: 600; color: white; margin-bottom: 0.25rem; }
+  .dropzone-sub { font-size: 0.875rem; color: var(--text-dim); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-radius: 12px;
+    font-size: 0.875rem; font-weight: 600;
+    background: none;
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary {
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #06b6d4);
+    border: 0;
+    color: white;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+  }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.15); box-shadow: 0 12px 30px rgba(139, 92, 246, 0.5); }
+  .btn-danger { background: rgba(244, 63, 94, 0.12); border-color: rgba(244, 63, 94, 0.35); color: #fda4af; }
+  .btn-danger:hover:not(:disabled) { background: rgba(244, 63, 94, 0.2); }
+  .btn-block { width: 100%; padding: 0.875rem 1rem; font-size: 1rem; }
+  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; border-radius: 8px; }
+  .btn-icon { padding: 0.5rem; width: 2.25rem; height: 2.25rem; }
+
+  /* Inputs */
+  .input, .select, textarea.input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.875rem;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .input:focus, .select:focus, textarea.input:focus { border-color: rgba(168, 85, 247, 0.6); box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15); }
+  .input::placeholder, textarea.input::placeholder { color: var(--text-faint); }
+  textarea.input { resize: vertical; min-height: 100px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+  .select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem; padding-right: 2.25rem; }
+  .select option { background: #12121f; color: var(--text); }
+  .label { display: block; margin-bottom: 0.5rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+
+  .field-grid { display: grid; gap: 1rem; }
+  @media (min-width: 640px) { .field-grid.cols-2 { grid-template-columns: 1fr 1fr; } }
+
+  /* Chips */
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+
+  /* Progress */
+  .progress { margin-top: 0.5rem; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.5rem; }
+  .progress-label .title { color: var(--text); font-weight: 500; }
+  .progress-label .pct { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .progress-bar { height: 10px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
+
+  /* Steps */
+  .steps { display: flex; flex-direction: column; gap: 0.5rem; }
+  .step { display: flex; gap: 1rem; }
+  .step-num {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 0.875rem; font-weight: 700;
+    flex-shrink: 0;
+    border: 1px solid var(--border-2);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-faint);
+  }
+  .step.active .step-num { background: rgba(168, 85, 247, 0.25); color: #ddd6fe; border-color: rgba(168, 85, 247, 0.6); }
+  .step.done .step-num { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); }
+  .step.error .step-num { background: rgba(244, 63, 94, 0.2); color: #fda4af; border-color: rgba(244, 63, 94, 0.4); }
+  .step-content { flex: 1; padding-top: 0.5rem; }
+  .step-title { font-weight: 600; font-size: 0.9rem; color: var(--text-dim); }
+  .step.active .step-title, .step.done .step-title { color: var(--text); }
+
+  /* Live feed */
+  .feed {
+    height: 256px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    font-size: 0.875rem;
+  }
+  .feed-empty { height: 100%; display: grid; place-items: center; color: var(--text-faint); text-align: center; }
+  .feed-line { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; }
+  .feed-time { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: rgba(196, 181, 253, 0.8); flex-shrink: 0; padding-top: 2px; }
+  .feed-text { color: var(--text); }
+
+  /* Media player */
+  .media-wrap {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    background: black;
+  }
+  .media-wrap video, .media-wrap audio { width: 100%; display: block; }
+  .media-wrap audio { padding: 1rem; background: var(--card); }
+  .media-info {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.2);
+  }
+  .media-name { font-size: 0.875rem; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .media-meta { font-size: 0.75rem; color: var(--text-dim); }
+
+  /* Engine selector */
+  .engine-btn {
+    display: block; width: 100%;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    color: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .engine-btn:hover:not(:disabled) { background: rgba(255,255,255,0.05); }
+  .engine-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .engine-btn.active { border-color: rgba(168, 85, 247, 0.6); background: rgba(168, 85, 247, 0.12); }
+  .engine-btn .t { font-weight: 600; color: white; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; }
+  .engine-btn .s { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem; }
+
+  /* Model picker */
+  .models { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .model-btn {
+    padding: 0.75rem;
+    text-align: left;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    color: inherit;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .model-btn:hover { background: rgba(255,255,255,0.05); }
+  .model-btn.active { border-color: rgba(168, 85, 247, 0.6); background: rgba(168, 85, 247, 0.12); }
+  .model-btn .n { font-weight: 600; color: white; font-size: 0.875rem; }
+  .model-btn .d { font-size: 0.7rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+  /* Record button */
+  .record-area {
+    display: flex; align-items: center; justify-content: center; gap: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.02);
+  }
+  .record-btn {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    border: 0;
+    background: linear-gradient(135deg, #f43f5e, #ec4899);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+    transition: transform 0.2s;
+  }
+  .record-btn:hover { transform: scale(1.05); }
+  .record-btn.recording { background: var(--danger); }
+
+  /* File list */
+  .file-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
+  .file-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--border);
+  }
+  .file-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .file-icon.pending { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+  .file-icon.done { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+  .file-icon.busy { background: rgba(168, 85, 247, 0.15); color: #c4b5fd; }
+  .file-icon.err { background: rgba(244, 63, 94, 0.15); color: #fda4af; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 0.875rem; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 0.75rem; color: var(--text-dim); }
+  .file-actions { display: flex; gap: 0.375rem; }
+  .file-remove { background: none; border: 0; color: var(--text-faint); cursor: pointer; padding: 0.25rem; }
+  .file-remove:hover { color: var(--danger); }
+
+  /* History grid */
+  .history-grid { display: grid; gap: 1rem; }
+  @media (min-width: 640px) { .history-grid { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1024px) { .history-grid { grid-template-columns: 1fr 1fr 1fr; } }
+  .history-card {
+    display: flex; flex-direction: column;
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .history-card:hover { transform: translateY(-4px); border-color: rgba(168, 85, 247, 0.4); box-shadow: 0 20px 40px -10px rgba(139, 92, 246, 0.2); }
+  .history-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+  .history-title { font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-date { font-size: 0.75rem; color: var(--text-faint); margin-top: 0.25rem; }
+  .history-preview {
+    flex: 1; margin-top: 1rem;
+    padding: 0.75rem;
+    background: rgba(0,0,0,0.25);
+    border-radius: 12px;
+    min-height: 60px;
+  }
+  .history-preview p { margin: 0 0 0.25rem; font-family: 'Kantumruy Pro'; font-size: 0.875rem; color: var(--text); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .history-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+  /* Editor */
+  .editor-head {
+    display: flex; flex-direction: column; gap: 1rem;
+    padding: 1.25rem;
+    border-radius: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    margin-bottom: 1.5rem;
+  }
+  @media (min-width: 640px) { .editor-head { flex-direction: row; align-items: center; justify-content: space-between; } }
+  .editor-title {
+    background: none; border: 0;
+    font-size: 1.25rem; font-weight: 700; color: white;
+    padding: 0.25rem 0.5rem; border-radius: 8px;
+    width: 100%;
+    font-family: inherit;
+  }
+  .editor-title:hover { background: rgba(255,255,255,0.05); }
+  .editor-title:focus { background: rgba(255,255,255,0.08); outline: none; }
+
+  .editor-grid { display: grid; gap: 1.5rem; }
+  @media (min-width: 1280px) { .editor-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
+  @media (min-width: 1280px) { .editor-left { position: sticky; top: 1.5rem; align-self: start; } }
+
+  .video-preview { position: relative; background: black; border-radius: 16px; overflow: hidden; }
+  .video-preview video { width: 100%; display: block; aspect-ratio: 16/9; }
+  .video-subtitles {
+    position: absolute; left: 0; right: 0; bottom: 3.5rem;
+    text-align: center; padding: 0 1.5rem;
+    pointer-events: none;
+  }
+  .video-subtitles .km {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    background: rgba(0,0,0,0.6);
+    border-radius: 8px;
+    font-family: 'Kantumruy Pro';
+    color: white;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+  .video-subtitles .orig {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.62em;
+    color: #fde68a;
+  }
+
+  .audio-preview { padding: 1.25rem; }
+  .audio-fake {
+    position: relative;
+    min-height: 180px;
+    border-radius: 16px;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(6, 182, 212, 0.4));
+    display: grid; place-items: center;
+    text-align: center;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    border: 1px solid var(--border-2);
+  }
+  .audio-fake::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at 30% 20%, #a855f7, transparent 50%), radial-gradient(circle at 70% 80%, #06b6d4, transparent 50%);
+    opacity: 0.4;
+  }
+  .audio-fake-content { position: relative; z-index: 1; }
+  .audio-fake .km {
+    font-family: 'Kantumruy Pro'; font-weight: 600; color: white;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+  .audio-fake .orig { margin-top: 0.5rem; color: #fde68a; }
+
+  .media-controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text);
+  }
+  .toggle-group { display: inline-flex; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+  .toggle-btn {
+    padding: 0.375rem 0.75rem;
+    background: none; border: 0; color: var(--text);
+    cursor: pointer;
+    text-transform: capitalize;
+    font-family: inherit;
+    font-size: 0.75rem;
+  }
+  .toggle-btn.active { background: rgba(168, 85, 247, 0.3); color: white; }
+  .toggle-btn:hover:not(.active) { background: rgba(255,255,255,0.05); }
+
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  @media (min-width: 640px) { .export-grid { grid-template-columns: repeat(3, 1fr); } }
+  .export-btn {
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    color: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-family: inherit;
+  }
+  .export-btn:hover { background: rgba(255,255,255,0.07); transform: translateY(-2px); }
+  .export-btn.primary { background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(6, 182, 212, 0.15)); border-color: rgba(168, 85, 247, 0.4); }
+  .export-btn .t { font-size: 0.875rem; font-weight: 600; color: white; display: flex; align-items: center; gap: 0.375rem; }
+  .export-btn .s { font-size: 0.7rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+  .tool-section { display: flex; flex-direction: column; gap: 1rem; }
+
+  .cue-list {
+    border-radius: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+  }
+  .cue-search {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .cue-search .input { padding-left: 2.25rem; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 0.75rem center; background-size: 1rem; }
+  .cue-scroll { max-height: calc(100vh - 14rem); min-height: 400px; overflow-y: auto; }
+  .cue-row {
+    display: flex; gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    position: relative;
+    transition: background 0.2s;
+  }
+  .cue-row:hover { background: rgba(255,255,255,0.025); }
+  .cue-row.active { background: rgba(168, 85, 247, 0.12); }
+  .cue-row.active::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: linear-gradient(180deg, #ec4899, #06b6d4);
+  }
+  .cue-num {
+    width: 32px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+    padding-top: 0.25rem;
+  }
+  .cue-num .n { font-size: 0.75rem; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+  .cue-play {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    border: 0; color: var(--text);
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .cue-play:hover { background: rgba(168, 85, 247, 0.3); color: white; }
+  .cue-body { flex: 1; min-width: 0; }
+  .cue-times {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+    font-size: 0.75rem; color: var(--text-faint);
+    margin-bottom: 0.375rem;
+  }
+  .cue-time {
+    width: 7.5rem;
+    padding: 0.2rem 0.4rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    outline: none;
+  }
+  .cue-time:hover { border-color: var(--border); }
+  .cue-time:focus { border-color: rgba(168, 85, 247, 0.5); background: rgba(0,0,0,0.3); }
+  .cue-duration { font-size: 0.7rem; color: var(--text-faint); margin-left: 0.25rem; }
+  .cue-actions {
+    margin-left: auto;
+    display: flex; gap: 0.25rem;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .cue-row:hover .cue-actions { opacity: 1; }
+  .cue-act {
+    background: none; border: 0; color: var(--text-dim);
+    padding: 0.375rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .cue-act:hover { background: rgba(255,255,255,0.1); color: white; }
+  .cue-act.danger:hover { background: rgba(244, 63, 94, 0.2); color: #fda4af; }
+  .cue-orig, .cue-km {
+    display: block; width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.875rem;
+    outline: none;
+    resize: none;
+    overflow: hidden;
+    min-height: 1.5em;
+  }
+  .cue-orig { color: var(--text-dim); }
+  .cue-orig:hover { border-color: var(--border); }
+  .cue-orig:focus { border-color: var(--border-2); background: rgba(0,0,0,0.3); }
+  .cue-km {
+    font-family: 'Kantumruy Pro';
+    font-size: 1rem;
+    line-height: 1.5;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 0.375rem 0.625rem;
+    margin-top: 0.375rem;
+    color: white;
+  }
+  .cue-km.empty { border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.06); }
+  .cue-km:focus { border-color: rgba(168, 85, 247, 0.5); background: rgba(0,0,0,0.4); }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 5rem 2rem;
+  }
+  .empty-icon {
+    width: 80px; height: 80px;
+    margin: 0 auto 1rem;
+    border-radius: 24px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(139, 92, 246, 0.15));
+    border: 1px solid var(--border-2);
+    font-family: 'Kantumruy Pro';
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+  }
+  .empty h3 { font-size: 1.125rem; font-weight: 600; color: white; margin: 0 0 0.5rem; }
+  .empty p { color: var(--text-dim); margin: 0 0 1.25rem; max-width: 320px; margin-left: auto; margin-right: auto; }
+
+  /* Features */
+  .features { display: grid; gap: 1rem; margin-top: 4rem; }
+  @media (min-width: 640px) { .features { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1024px) { .features { grid-template-columns: repeat(4, 1fr); } }
+  .feature {
+    padding: 1.25rem;
+    border-radius: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    transition: transform 0.2s;
+  }
+  .feature:hover { transform: translateY(-4px); }
+  .feature .ic { font-size: 1.5rem; }
+  .feature h4 { margin: 0.75rem 0 0.375rem; font-weight: 600; color: white; }
+  .feature p { margin: 0; font-size: 0.875rem; color: var(--text-dim); line-height: 1.5; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%);
+    padding: 0.625rem 1rem;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--border-2);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.875rem;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    animation: slide-up 0.3s ease-out;
+  }
+  @keyframes slide-up {
+    from { transform: translate(-50%, 20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+
+  /* Telegram contact floating button */
+  .tg-fab {
+    position: fixed;
+    bottom: 1.5rem; right: 1.5rem;
+    z-index: 99;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.875rem 1.125rem 0.875rem 1rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #229ED9, #1e88c7);
+    color: white;
+    text-decoration: none;
+    font-size: 0.875rem; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(34, 158, 217, 0.45), 0 2px 6px rgba(0,0,0,0.3);
+    transition: all 0.25s;
+    font-family: inherit;
+  }
+  .tg-fab:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 16px 40px rgba(34, 158, 217, 0.6), 0 4px 10px rgba(0,0,0,0.35);
+    background: linear-gradient(135deg, #2bb0ed, #229ED9);
+  }
+  .tg-fab svg { flex-shrink: 0; }
+  .tg-fab-label { display: none; }
+  @media (min-width: 480px) { .tg-fab-label { display: inline; } }
+  @media (max-width: 480px) { .tg-fab { padding: 0.875rem; } }
+
+  /* Footer contact link */
+  .footer-contact {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(34, 158, 217, 0.12);
+    border: 1px solid rgba(34, 158, 217, 0.3);
+    color: #7dd3fc;
+    font-size: 0.75rem;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .footer-contact:hover {
+    background: rgba(34, 158, 217, 0.22);
+    border-color: rgba(34, 158, 217, 0.5);
+    color: white;
+  }
+
+  /* Footer */
+  footer { text-align: center; color: var(--text-faint); font-size: 0.75rem; margin-top: 4rem; }
+  footer a { color: var(--text-dim); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+
+  /* Preview panel in SRT tab */
+  .preview-panel { display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; max-height: 500px; }
+  .preview-item {
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--border);
+  }
+  .preview-orig { font-size: 0.75rem; color: var(--text-dim); }
+  .preview-km { font-family: 'Kantumruy Pro'; color: white; font-size: 1rem; line-height: 1.5; margin-top: 0.25rem; }
+
+  .section-title {
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text-faint);
+    margin: 0 0 1rem;
+  }
+
+  .error-box {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(244, 63, 94, 0.1);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+    color: #fecaca;
+    font-size: 0.875rem;
+  }
+  .error-box strong { color: inherit; display: block; margin-bottom: 0.25rem; }
+  .warn-box {
+    margin-top: 1rem;
+    padding: 0.875rem;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fde68a;
+    font-size: 0.875rem;
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* Hidden */
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="bg-aurora"></div>
+<div class="bg-grid"></div>
+
+<div class="app">
+  <header class="header">
+    <button class="brand" onclick="goHome()">
+      <div class="brand-logo font-khmer">ក</div>
+      <div>
+        <div class="brand-name">KhmerSub<span class="grad"> AI</span></div>
+        <div class="brand-sub">អក្សររត់ខ្មែរ ដោយ AI</div>
+      </div>
+    </button>
+    <div class="brand-badges">
+      <span class="chip">🔒 Private in-browser AI</span>
+      <span class="chip">⚡ 100+ languages</span>
+    </div>
+    <button class="share-btn" onclick="shareApp()" title="Copy link to clipboard — share with anyone!">
+      <span class="share-icon">🔗</span>
+      <span class="share-label">Share App</span>
+    </button>
+  </header>
+
+  <div id="home-view">
+    <section class="hero">
+      <div class="badge">✨ Whisper AI speech recognition + neural translation</div>
+      <h1>Any speech. Any subtitle.<br/><span class="grad">Perfect Khmer SRT.</span></h1>
+      <p>Turn audio &amp; video into timed Khmer subtitles, or translate any SRT file into Khmer — then fine-tune with a live preview editor.</p>
+      <p class="kh">បង្កើតអក្សររត់ខ្មែរពីសំឡេង ឬបកប្រែឯកសារ SRT បានយ៉ាងងាយស្រួល</p>
+    </section>
+
+    <div class="tabs">
+      <div class="tabs-inner">
+        <button class="tab active" data-tab="audio" onclick="switchTab('audio')">🎙️ <span>Audio / Video</span> <span class="tab-kh">· សំឡេង</span></button>
+        <button class="tab" data-tab="srt" onclick="switchTab('srt')">📄 <span>Translate SRT</span> <span class="tab-kh">· បកប្រែ SRT</span></button>
+        <button class="tab" data-tab="history" onclick="switchTab('history')">🕘 <span>History</span> <span class="tab-kh">· ប្រវត្តិ</span></button>
+      </div>
+    </div>
+
+    <div id="tab-audio"></div>
+    <div id="tab-srt" hidden></div>
+    <div id="tab-history" hidden></div>
+
+    <section class="features">
+      <div class="feature">
+        <div class="ic">🎙️</div>
+        <h4>Speech to Khmer</h4>
+        <p>Upload audio/video or record your mic. Whisper AI transcribes with precise timings.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">📄</div>
+        <h4>SRT &amp; VTT translate</h4>
+        <p>Batch translate subtitle files from 100+ languages while keeping every timestamp.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">🎬</div>
+        <h4>Live preview editor</h4>
+        <p>Watch Khmer subtitles over your video, edit lines, shift timing, merge &amp; split.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">💾</div>
+        <h4>Export anything</h4>
+        <p>Khmer SRT, bilingual SRT, WebVTT or plain text. Auto-saved to your history.</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="editor-view" hidden></div>
+</div>
+
+<footer>
+  KhmerSub AI · Speech recognition runs locally in your browser · <span class="font-khmer">សូមអរគុណ</span>
+  <br/>
+  <a href="deployment.html" target="_blank" rel="noopener">Hosting &amp; deployment guide →</a>
+  &nbsp;·&nbsp;
+  <a href="share.html" target="_blank" rel="noopener">Share this app ↗</a>
+  &nbsp;·&nbsp;
+  <a href="index.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+  <br/>
+  <a href="https://t.me/Nuthkna" target="_blank" rel="noopener" class="footer-contact">
+    📬 Contact owner: @Nuthkna on Telegram · Report bugs · Share suggestions
+  </a>
+</footer>
+
+<!-- Floating Telegram contact button -->
+<a href="https://t.me/Nuthkna" target="_blank" rel="noopener" class="tg-fab" title="Contact owner on Telegram — report bugs or share suggestions">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
+    <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+  </svg>
+  <span class="tg-fab-label">Contact</span>
+</a>
+
+<div id="toast-container"></div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  view: 'home',       // 'home' | 'editor'
+  tab: 'audio',       // 'audio' | 'srt' | 'history'
+  // Audio tab
+  audio: {
+    file: null, mediaUrl: null, mediaKind: null,
+    engine: 'browser', model: 'onnx-community/whisper-base',
+    language: 'auto', preferGpu: true, maxChars: 84,
+    phase: 'idle',    // 'idle' | 'decoding' | 'loading' | 'transcribing' | 'translating' | 'done' | 'error'
+    failedAt: null, errorMsg: '',
+    loadFiles: {},    // { filename: {loaded, total} }
+    device: '',
+    tProgress: 0, tStart: 0,
+    live: [],         // cues so far
+    trProgress: { done: 0, total: 0 },
+    duration: 0,
+    recording: false, recSeconds: 0,
+    cancel: false,
+  },
+  // SRT tab
+  srt: {
+    items: [],        // { name, cues, status, done, detected, error }
+    paste: '', showPaste: false,
+    source: 'auto', running: false, errorMsg: '',
+    previewKm: [],
+  },
+  // History
+  history: { list: [], q: '' },
+  // Editor
+  editor: null,       // { title, kind, sourceLang, cues, mediaUrl, mediaKind, id }
+};
+
+let worker = null;
+let mediaEl = null;    // current <video>/<audio> element
+let activeCueIdx = -1;
+let editorFollow = true;
+let editorDisplay = 'khmer';
+let editorFontSize = 26;
+let editorQuery = '';
+let editorSaveTimer = null;
+let editorSaveState = 'idle';
+let toastTimer = null;
+let recRef = null;
+let recTimer = null;
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function pad(n, len = 2) { return String(Math.floor(n)).padStart(len, '0'); }
+function formatTime(sec) {
+  if (!Number.isFinite(sec) || sec < 0) sec = 0;
+  const ms = Math.round(sec * 1000);
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const r = ms % 1000;
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(r, 3)}`;
+}
+function formatTimeDot(sec) { return formatTime(sec).replace(',', '.'); }
+function formatShort(sec) {
+  if (!Number.isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60), h = Math.floor(m / 60);
+  return h > 0 ? `${h}:${pad(m % 60)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+function parseTime(str) {
+  const t = str.trim().replace(',', '.');
+  const parts = t.split(':');
+  if (parts.length < 2 || parts.length > 3) { const n = Number(t); return Number.isFinite(n) ? n : NaN; }
+  const nums = parts.map(Number);
+  if (nums.some(n => !Number.isFinite(n))) return NaN;
+  return nums.length === 3 ? nums[0]*3600 + nums[1]*60 + nums[2] : nums[0]*60 + nums[1];
+}
+function fmtBytes(n) {
+  if (n > 1e9) return (n / 1e9).toFixed(2) + ' GB';
+  if (n > 1e6) return (n / 1e6).toFixed(1) + ' MB';
+  return (n / 1e3).toFixed(0) + ' KB';
+}
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function baseName(fn) { return fn.replace(/\.[^.]+$/, '') || 'subtitles'; }
+function toast(msg) {
+  const c = document.getElementById('toast-container');
+  c.innerHTML = `<div class="toast">${escapeHtml(msg)}</div>`;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { c.innerHTML = ''; }, 2200);
+}
+
+async function shareApp() {
+  const url = window.location.href;
+  const btn = document.querySelector('.share-btn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  try {
+    // Try the modern share API first (shows native share sheet on mobile)
+    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
+      await navigator.share({
+        title: 'KhmerSub AI',
+        text: 'Turn any audio/video into Khmer subtitles — free, in your browser.',
+        url,
+      });
+      toast('Shared!');
+      return;
+    }
+    // Fall back to copying to clipboard
+    await navigator.clipboard.writeText(url);
+    if (btn) {
+      btn.classList.add('copied');
+      btn.innerHTML = '<span class="share-icon">✓</span><span class="share-label">Link copied!</span>';
+      setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = originalHtml; }, 2000);
+    }
+    toast('🔗 Link copied to clipboard — paste it anywhere to open the app!');
+  } catch (err) {
+    // Fallback: select URL in a prompt so user can copy manually
+    window.prompt('Copy this link to share the app:', url);
+  }
+}
+
+/* ============================================================
+   LANGUAGES
+   ============================================================ */
+const LANGUAGES = [
+  { code: 'auto', google: 'auto', name: 'Auto detect', flag: '✨' },
+  { code: 'en', google: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'zh', google: 'zh-CN', name: 'Chinese', flag: '🇨🇳' },
+  { code: 'th', google: 'th', name: 'Thai', flag: '🇹🇭' },
+  { code: 'vi', google: 'vi', name: 'Vietnamese', flag: '🇻🇳' },
+  { code: 'ko', google: 'ko', name: 'Korean', flag: '🇰🇷' },
+  { code: 'ja', google: 'ja', name: 'Japanese', flag: '🇯🇵' },
+  { code: 'lo', google: 'lo', name: 'Lao', flag: '🇱🇦' },
+  { code: 'ms', google: 'ms', name: 'Malay', flag: '🇲🇾' },
+  { code: 'id', google: 'id', name: 'Indonesian', flag: '🇮🇩' },
+  { code: 'tl', google: 'tl', name: 'Filipino', flag: '🇵🇭' },
+  { code: 'my', google: 'my', name: 'Burmese', flag: '🇲🇲' },
+  { code: 'hi', google: 'hi', name: 'Hindi', flag: '🇮🇳' },
+  { code: 'fr', google: 'fr', name: 'French', flag: '🇫🇷' },
+  { code: 'es', google: 'es', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'pt', google: 'pt', name: 'Portuguese', flag: '🇵🇹' },
+  { code: 'de', google: 'de', name: 'German', flag: '🇩🇪' },
+  { code: 'it', google: 'it', name: 'Italian', flag: '🇮🇹' },
+  { code: 'ru', google: 'ru', name: 'Russian', flag: '🇷🇺' },
+  { code: 'ar', google: 'ar', name: 'Arabic', flag: '🇸🇦' },
+  { code: 'tr', google: 'tr', name: 'Turkish', flag: '🇹🇷' },
+  { code: 'nl', google: 'nl', name: 'Dutch', flag: '🇳🇱' },
+  { code: 'pl', google: 'pl', name: 'Polish', flag: '🇵🇱' },
+  { code: 'uk', google: 'uk', name: 'Ukrainian', flag: '🇺🇦' },
+  { code: 'km', google: 'km', name: 'Khmer', flag: '🇰🇭' },
+];
+const LANG_BY_CODE = Object.fromEntries(LANGUAGES.map(l => [l.code, l]));
+const LANG_BY_GOOGLE = Object.fromEntries(LANGUAGES.map(l => [l.google, l]));
+function langName(code) { return (LANG_BY_CODE[code] || LANG_BY_GOOGLE[code] || {}).name || (code || '').toUpperCase(); }
+function toGoogle(code) { return (LANG_BY_CODE[code] || {}).google || code; }
+
+const WHISPER_MODELS = [
+  { id: 'onnx-community/whisper-tiny',  name: 'Tiny',  size: '~75 MB',  note: 'Fastest' },
+  { id: 'onnx-community/whisper-base',  name: 'Base',  size: '~140 MB', note: 'Balanced' },
+  { id: 'onnx-community/whisper-small', name: 'Small', size: '~480 MB', note: 'Most accurate' },
+];
+
+/* ============================================================
+   SRT PARSING / BUILDING
+   ============================================================ */
+const TIME_LINE = /^\s*((?:\d+:)?\d{1,2}:\d{1,2}(?:[.,]\d{1,3})?)\s*-->\s*((?:\d+:)?\d{1,2}:\d{1,2}(?:[.,]\d{1,3})?)/;
+function cleanText(lines) {
+  return lines.join('\n')
+    .replace(/<\/?(?:i|b|u|font|c|v|ruby|rt|lang)[^>]*>/gi, '')
+    .replace(/\{\\[^}]*\}/g, '')
+    .replace(/<\d{2}:\d{2}[^>]*>/g, '')
+    .trim();
+}
+function parseSubtitles(content) {
+  const text = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  const lines = text.split('\n');
+  const cues = [];
+  let i = 0;
+  while (i < lines.length) {
+    const m = lines[i].match(TIME_LINE);
+    if (!m) { i++; continue; }
+    const start = parseTime(m[1]);
+    const end = parseTime(m[2]);
+    i++;
+    const body = [];
+    while (i < lines.length && lines[i].trim() !== '') {
+      if (TIME_LINE.test(lines[i])) break;
+      body.push(lines[i]);
+      i++;
+    }
+    if (body.length > 1 && /^\d+$/.test(body[body.length - 1].trim()) && i < lines.length && TIME_LINE.test(lines[i] ?? '')) body.pop();
+    const t = cleanText(body);
+    if (Number.isFinite(start) && Number.isFinite(end) && t) {
+      cues.push({ start, end: Math.max(end, start), text: t, km: '' });
+    }
+  }
+  return cues;
+}
+function cueText(c, mode) {
+  if (mode === 'original') return c.text;
+  if (mode === 'khmer') return c.km || c.text;
+  return [c.km, c.text].filter(Boolean).join('\n');
+}
+function buildSrt(cues, mode = 'khmer') {
+  return cues.map((c, i) => `${i+1}\n${formatTime(c.start)} --> ${formatTime(c.end)}\n${cueText(c, mode)}`).join('\n\n') + '\n';
+}
+function buildVtt(cues, mode = 'khmer') {
+  return 'WEBVTT\n\n' + cues.map((c, i) => `${i+1}\n${formatTimeDot(c.start)} --> ${formatTimeDot(c.end)}\n${cueText(c, mode)}`).join('\n\n') + '\n';
+}
+function buildPlainText(cues, mode = 'khmer') {
+  return cues.map(c => cueText(c, mode)).join('\n');
+}
+function downloadFile(filename, content, mime = 'text/plain') {
+  const blob = new Blob(['\uFEFF' + content], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+async function downloadZip(files, zipName = 'Translate-Sub-khmer.zip') {
+  const zip = new JSZip();
+  const used = new Set();
+  for (const f of files) {
+    let safe = f.name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'subtitles.srt';
+    if (used.has(safe.toLowerCase())) {
+      const dot = safe.lastIndexOf('.');
+      let n = 2, candidate = safe;
+      do { candidate = dot > 0 ? `${safe.slice(0, dot)} (${n})${safe.slice(dot)}` : `${safe} (${n})`; n++; }
+      while (used.has(candidate.toLowerCase()));
+      safe = candidate;
+    }
+    used.add(safe.toLowerCase());
+    zip.file(safe, '\uFEFF' + f.content);
+  }
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = zipName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function splitLongCues(cues, maxChars = 84) {
+  const out = [];
+  for (const c of cues) {
+    if (c.text.length <= maxChars) { out.push(c); continue; }
+    let parts = (c.text.match(/[^.!?。！？]+[.!?。！？]*\s*/g) || [c.text]).map(s => s.trim()).filter(Boolean);
+    const refined = [];
+    for (const p of parts) {
+      if (p.length <= maxChars) { refined.push(p); continue; }
+      const words = p.split(/\s+/);
+      let cur = '';
+      for (const w of words) {
+        if ((cur + ' ' + w).trim().length > maxChars && cur) { refined.push(cur.trim()); cur = w; }
+        else cur = (cur + ' ' + w).trim();
+      }
+      if (cur) refined.push(cur);
+    }
+    parts = [];
+    for (const r of refined) {
+      const last = parts[parts.length - 1];
+      if (last && (last + ' ' + r).length <= maxChars && (r.length < 20 || last.length < 20)) parts[parts.length - 1] = last + ' ' + r;
+      else parts.push(r);
+    }
+    const totalLen = parts.reduce((s, p) => s + p.length, 0) || 1;
+    const dur = c.end - c.start;
+    let t = c.start;
+    parts.forEach((p, i) => {
+      const d = (dur * p.length) / totalLen;
+      const end = i === parts.length - 1 ? c.end : t + d;
+      out.push({ start: t, end, text: p, km: '' });
+      t = end;
+    });
+  }
+  return out;
+}
+
+/* ============================================================
+   TRANSLATION
+   ============================================================ */
+const GTX = 'https://translate.googleapis.com/translate_a/t?client=gtx&format=text';
+
+function normalizeGtx(data, count) {
+  let detected;
+  const pick = item => {
+    if (typeof item === 'string') return item;
+    if (Array.isArray(item) && typeof item[0] === 'string') {
+      if (typeof item[1] === 'string') detected = detected ?? item[1];
+      return item[0];
+    }
+    return '';
+  };
+  if (!Array.isArray(data)) throw new Error('Bad response');
+  if (count === 1) {
+    if (data.length === 2 && typeof data[0] === 'string' && typeof data[1] === 'string' && !Array.isArray(data[0])) {
+      return { texts: [data[0]], detected: data[1] };
+    }
+    if (data.length >= 1) return { texts: [pick(data[0])], detected };
+  }
+  return { texts: data.map(pick), detected };
+}
+
+async function translateBatch(texts, source = 'auto', target = 'km') {
+  const body = new URLSearchParams();
+  texts.forEach(t => body.append('q', t));
+  const res = await fetch(`${GTX}&sl=${encodeURIComponent(source)}&tl=${encodeURIComponent(target)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!res.ok) throw new Error(`Translate failed (${res.status})`);
+  return normalizeGtx(await res.json(), texts.length);
+}
+
+async function translateAll(texts, opts = {}) {
+  const source = opts.source ?? 'auto';
+  const target = opts.target ?? 'km';
+  const out = new Array(texts.length).fill('');
+  let detected;
+  const batches = [];
+  let cur = [], chars = 0;
+  texts.forEach((t, i) => {
+    const len = t.length + 10;
+    if (cur.length && (cur.length >= 50 || chars + len > 4500)) { batches.push(cur); cur = []; chars = 0; }
+    cur.push(i); chars += len;
+  });
+  if (cur.length) batches.push(cur);
+  let done = 0, next = 0;
+  async function run() {
+    while (next < batches.length) {
+      if (opts.signal?.aborted) throw new Error('Aborted');
+      const batch = batches[next++];
+      const input = batch.map(i => (texts[i] || ' ').replace(/\s*\n\s*/g, ' ').trim() || ' ');
+      let attempt = 0;
+      for (;;) {
+        try {
+          const r = await translateBatch(input, source, target);
+          detected = detected ?? r.detected;
+          batch.forEach((idx, k) => (out[idx] = (r.texts[k] ?? '').trim()));
+          break;
+        } catch (e) {
+          attempt++;
+          if (attempt >= 4) throw e;
+          await new Promise(r => setTimeout(r, 800 * attempt));
+        }
+      }
+      done += batch.length;
+      opts.onProgress?.(done, texts.length, out.slice());
+    }
+  }
+  const concurrency = Math.min(3, batches.length);
+  await Promise.all(Array.from({ length: concurrency }, run));
+  return { texts: out, detected };
+}
+
+/* ============================================================
+   AUDIO DECODING
+   ============================================================ */
+async function decodeTo16kMono(file) {
+  const buf = await file.arrayBuffer();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  let decoded;
+  try {
+    const ctx = new Ctx({ sampleRate: 16000 });
+    decoded = await ctx.decodeAudioData(buf.slice(0));
+    await ctx.close();
+  } catch {
+    const ctx = new Ctx();
+    const native = await ctx.decodeAudioData(buf.slice(0));
+    await ctx.close();
+    const off = new OfflineAudioContext(1, Math.ceil(native.duration * 16000), 16000);
+    const src = off.createBufferSource();
+    src.buffer = native; src.connect(off.destination); src.start();
+    decoded = await off.startRendering();
+  }
+  let audio;
+  if (decoded.numberOfChannels >= 2) {
+    const a = decoded.getChannelData(0), b = decoded.getChannelData(1);
+    audio = new Float32Array(a.length);
+    const SCALE = Math.SQRT2;
+    for (let i = 0; i < a.length; i++) audio[i] = (SCALE * (a[i] + b[i])) / 2;
+  } else {
+    audio = new Float32Array(decoded.getChannelData(0));
+  }
+  return { audio, duration: decoded.duration };
+}
+
+/* ============================================================
+   WHISPER WORKER
+   ============================================================ */
+function getWorker() {
+  if (worker) return worker;
+  worker = new Worker('whisper-worker.js', { type: 'module' });
+  return worker;
+}
+function killWorker() {
+  if (worker) { worker.terminate(); worker = null; }
+}
+
+function transcribeInBrowser(audio) {
+  const w = getWorker();
+  return new Promise((resolve, reject) => {
+    const acc = [];
+    w.onmessage = e => {
+      const m = e.data;
+      if (m.type === 'load-progress') {
+        const p = m.data;
+        if (p.status === 'progress' && p.file && p.total) {
+          state.audio.loadFiles[p.file] = { loaded: p.loaded, total: p.total };
+          render();
+        } else if (p.status === 'done' && p.file) {
+          if (state.audio.loadFiles[p.file]) {
+            state.audio.loadFiles[p.file].loaded = state.audio.loadFiles[p.file].total;
+            render();
+          }
+        }
+      } else if (m.type === 'ready') {
+        state.audio.device = m.device;
+        state.audio.phase = 'transcribing';
+        state.audio.tStart = Date.now();
+        render();
+      } else if (m.type === 'partial') {
+        const cues = m.chunks.map(c => ({ ...c, km: '' }));
+        acc.push(...cues);
+        state.audio.live = [...state.audio.live, ...cues];
+        state.audio.tProgress = m.progress;
+        render();
+      } else if (m.type === 'complete') {
+        resolve(acc);
+      } else if (m.type === 'error') {
+        reject(new Error(m.message));
+      } else if (m.type === 'log') {
+        console.info('[whisper]', m.message);
+      }
+    };
+    w.onerror = e => reject(new Error(e.message || 'Speech recognition worker failed to start.'));
+    w.postMessage({
+      type: 'transcribe', audio,
+      model: state.audio.model, language: state.audio.language,
+      preferGpu: state.audio.preferGpu,
+    }, [audio.buffer]);
+  });
+}
+
+/* ============================================================
+   AUDIO PIPELINE
+   ============================================================ */
+async function runAudio() {
+  const a = state.audio;
+  if (!a.file) return;
+  a.cancel = false;
+  a.errorMsg = ''; a.failedAt = null;
+  a.live = []; a.loadFiles = {}; a.tProgress = 0; a.trProgress = { done: 0, total: 0 };
+  render();
+  let phase = 'decoding';
+  try {
+    let cues = [];
+    let detectedLang = a.language;
+    a.phase = 'decoding'; render();
+
+    const { audio, duration } = await decodeTo16kMono(a.file);
+    a.duration = duration;
+    if (a.cancel) return;
+    phase = 'loading'; a.phase = 'loading'; render();
+
+    cues = await transcribeInBrowser(audio);
+    phase = 'transcribing';
+    if (a.cancel) return;
+
+    cues = splitLongCues(cues, a.maxChars);
+    if (!cues.length) throw new Error('No speech was detected in this file. Try a different model or spoken language.');
+
+    phase = 'translating'; a.phase = 'translating';
+    a.trProgress = { done: 0, total: cues.length };
+    render();
+    if (detectedLang === 'km') {
+      cues = cues.map(c => ({ ...c, km: c.text }));
+    } else {
+      const ctrl = new AbortController();
+      const r = await translateAll(
+        cues.map(c => c.text),
+        {
+          source: toGoogle(detectedLang), target: 'km', signal: ctrl.signal,
+          onProgress: (done, total) => { a.trProgress = { done, total }; render(); },
+        }
+      );
+      if (detectedLang === 'auto' && r.detected) detectedLang = r.detected;
+      cues = cues.map((c, i) => ({ ...c, km: r.texts[i] || '' }));
+    }
+    if (a.cancel) return;
+
+    a.phase = 'done';
+    render();
+    openEditor({
+      title: baseName(a.file.name), kind: 'audio',
+      sourceLang: detectedLang, cues,
+      mediaUrl: a.mediaUrl, mediaKind: a.mediaKind,
+    });
+  } catch (err) {
+    if (a.cancel) return;
+    console.error(err);
+    a.failedAt = phase;
+    a.phase = 'error';
+    a.errorMsg = err instanceof Error ? err.message : String(err);
+    killWorker();
+    render();
+  }
+}
+
+/* ============================================================
+   SRT PIPELINE
+   ============================================================ */
+async function readTextFile(file) {
+  const buf = await file.arrayBuffer();
+  const utf8 = new TextDecoder('utf-8').decode(buf);
+  if (!utf8.includes('\uFFFD')) return utf8;
+  try {
+    const u16 = new Uint8Array(buf);
+    if (u16[0] === 0xff && u16[1] === 0xfe) return new TextDecoder('utf-16le').decode(buf);
+    if (u16[0] === 0xfe && u16[1] === 0xff) return new TextDecoder('utf-16be').decode(buf);
+    return new TextDecoder('windows-1252').decode(buf);
+  } catch { return utf8; }
+}
+
+async function addSrtFiles(files) {
+  const s = state.srt;
+  s.errorMsg = '';
+  for (const f of files) {
+    const cues = parseSubtitles(await readTextFile(f));
+    if (!cues.length) { s.errorMsg = `"${f.name}" doesn't contain any valid SRT/VTT subtitles.`; continue; }
+    s.items.push({ name: f.name, cues, status: 'ready', done: 0 });
+  }
+  render();
+}
+
+function addPaste() {
+  const s = state.srt;
+  const cues = parseSubtitles(s.paste);
+  if (!cues.length) { s.errorMsg = "Couldn't find any subtitles. Make sure it's valid SRT or VTT format."; return; }
+  s.errorMsg = '';
+  s.items.push({ name: `pasted-${s.items.length + 1}.srt`, cues, status: 'ready', done: 0 });
+  s.paste = ''; s.showPaste = false;
+  render();
+}
+
+async function runSrt() {
+  const s = state.srt;
+  s.running = true; s.errorMsg = '';
+  render();
+  const single = s.items.length === 1;
+  for (let i = 0; i < s.items.length; i++) {
+    const it = s.items[i];
+    if (it.status === 'done') continue;
+    it.status = 'translating'; it.done = 0; it.error = undefined;
+    render();
+    try {
+      let km, detected = s.source !== 'auto' ? s.source : undefined;
+      if (s.source === 'km') {
+        km = it.cues.map(c => c.text);
+      } else {
+        const r = await translateAll(
+          it.cues.map(c => c.text),
+          {
+            source: toGoogle(s.source), target: 'km',
+            onProgress: (done, _t, partial) => {
+              it.done = done;
+              s.previewKm = partial.map((k, idx) => ({ text: it.cues[idx].text, km: k })).filter(x => x.km).slice(-6);
+              render();
+            },
+          }
+        );
+        km = r.texts;
+        detected = detected ?? r.detected;
+      }
+      const cues = it.cues.map((c, k) => ({ ...c, km: km[k] || '' }));
+      it.status = 'done'; it.cues = cues; it.done = cues.length; it.detected = detected;
+      if (single) {
+        s.running = false; s.previewKm = [];
+        render();
+        openEditor({ title: baseName(it.name), kind: 'srt', sourceLang: detected ?? 'auto', cues });
+        return;
+      }
+      saveProject({ title: baseName(it.name), kind: 'srt', sourceLang: detected ?? 'auto', cues });
+    } catch (err) {
+      it.status = 'error'; it.error = err instanceof Error ? err.message : String(err);
+    }
+    render();
+  }
+  s.running = false; s.previewKm = [];
+  render();
+}
+
+/* ============================================================
+   HISTORY (localStorage)
+   ============================================================ */
+function loadHistory() {
+  try { state.history.list = JSON.parse(localStorage.getItem('khmersub.history') || '[]'); }
+  catch { state.history.list = []; }
+}
+function persistHistory() {
+  try { localStorage.setItem('khmersub.history', JSON.stringify(state.history.list)); }
+  catch (e) { console.warn('History save failed:', e); }
+}
+function saveProject(p) {
+  const item = {
+    id: Date.now() + Math.random().toString(36).slice(2, 7),
+    title: p.title || 'Untitled', kind: p.kind, sourceLang: p.sourceLang,
+    cues: p.cues, updatedAt: new Date().toISOString(), createdAt: new Date().toISOString(),
+  };
+  state.history.list = [item, ...state.history.list.filter(x => x.id !== item.id)].slice(0, 100);
+  persistHistory();
+  return item;
+}
+function updateProject(id, patch) {
+  state.history.list = state.history.list.map(p => p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p);
+  persistHistory();
+}
+function deleteProject(id) {
+  state.history.list = state.history.list.filter(p => p.id !== id);
+  persistHistory();
+}
+function getProject(id) { return state.history.list.find(p => p.id === id); }
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function switchTab(tab) {
+  state.tab = tab;
+  render();
+}
+function goHome() {
+  state.view = 'home';
+  state.editor = null;
+  activeCueIdx = -1;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function openEditor(session) {
+  // save if new
+  if (!session.id) {
+    const saved = saveProject(session);
+    session.id = saved.id;
+    editorSaveState = 'saved';
+  } else {
+    editorSaveState = 'saved';
+  }
+  state.editor = session;
+  state.view = 'editor';
+  activeCueIdx = -1;
+  editorQuery = '';
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ============================================================
+   RENDERING — AUDIO TAB
+   ============================================================ */
+function renderAudio() {
+  const a = state.audio;
+  const el = document.getElementById('tab-audio');
+  const stepState = step => {
+    if (a.phase === 'error' && a.failedAt === step) return 'error';
+    const order = ['decoding', 'loading', 'transcribing', 'translating', 'done'];
+    const cur = order.indexOf(a.phase === 'error' ? (a.failedAt || 'decoding') : a.phase);
+    const idx = order.indexOf(step);
+    if (a.phase === 'idle') return 'idle';
+    if (idx < cur) return 'done';
+    if (idx === cur) return a.phase === 'done' ? 'done' : a.phase === 'error' ? 'error' : 'active';
+    return 'idle';
+  };
+  const stepNum = (n, cls) => {
+    if (cls === 'done') return `<div class="step-num">✓</div>`;
+    if (cls === 'active') return `<div class="step-num"><span class="spinner"></span></div>`;
+    return `<div class="step-num">${n}</div>`;
+  };
+
+  const busy = ['decoding', 'loading', 'transcribing', 'translating'].includes(a.phase);
+  const loadTotals = Object.values(a.loadFiles).reduce((acc, f) => ({ loaded: acc.loaded + f.loaded, total: acc.total + f.total }), { loaded: 0, total: 0 });
+  const elapsed = a.tStart ? (Date.now() - a.tStart) / 1000 : 0;
+  const eta = a.tProgress > 0.03 && a.tProgress < 1 ? (elapsed / a.tProgress) * (1 - a.tProgress) : 0;
+
+  el.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-icon pink">🎙️</div>
+          <div>
+            <h2>Speech → Khmer Subtitles</h2>
+            <div class="sub">បំលែងសំឡេងទៅជាអក្សររត់ខ្មែរ</div>
+          </div>
+        </div>
+        ${!a.file ? `
+          <div class="dropzone" id="audio-drop">
+            <input type="file" id="audio-input" accept="audio/*,video/*" hidden />
+            <div class="dropzone-icon">⬆️</div>
+            <div class="dropzone-title">Drop audio or video file here</div>
+            <div class="dropzone-sub">MP3, WAV, M4A, OGG, FLAC, MP4, WEBM, MOV… any language</div>
+          </div>
+          <div style="text-align:center;margin:1rem 0;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-faint)">— or —</div>
+          <div class="record-area">
+            ${a.recording ? `
+              <button class="record-btn recording pulse-ring" onclick="stopRecording()">■</button>
+              <div>
+                <div style="font-weight:600;color:#fda4af">Recording… ${formatShort(a.recSeconds)}</div>
+                <div style="font-size:0.75rem;color:var(--text-dim)">Click to stop and use this recording</div>
+              </div>
+            ` : `
+              <button class="record-btn" onclick="startRecording()">🎤</button>
+              <div>
+                <div style="font-weight:600;color:white">Record from microphone</div>
+                <div style="font-size:0.75rem;color:var(--text-dim)">Speak in any language — get Khmer subtitles</div>
+              </div>
+            `}
+          </div>
+        ` : `
+          <div class="media-wrap">
+            ${a.mediaKind === 'video'
+              ? `<video src="${a.mediaUrl}" controls></video>`
+              : `<div style="padding:1rem;background:var(--card)"><audio src="${a.mediaUrl}" controls style="width:100%"></audio></div>`}
+            <div class="media-info">
+              <div style="min-width:0;flex:1">
+                <div class="media-name">${escapeHtml(a.file.name)}</div>
+                <div class="media-meta">${fmtBytes(a.file.size)}${a.duration ? ` · ${formatShort(a.duration)}` : ''}</div>
+              </div>
+              ${!busy ? `<button class="btn btn-sm" onclick="clearAudio()">✕ Change</button>` : ''}
+            </div>
+          </div>
+
+          <div class="field-grid cols-2" style="margin-top:1rem">
+            <div>
+              <label class="label">Spoken language</label>
+              <select class="select" onchange="state.audio.language=this.value">
+                ${LANGUAGES.map(l => `<option value="${l.code}" ${l.code === a.language ? 'selected' : ''}>${l.flag} ${l.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="label">Target</label>
+              <div class="input" style="display:flex;align-items:center;gap:0.5rem">
+                <span>🇰🇭</span> <span class="font-khmer">ភាសាខ្មែរ</span> <span style="color:var(--text-dim)">(Khmer)</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem">
+            <label class="label">Recognition engine</label>
+            <div style="display:grid;gap:0.5rem;grid-template-columns:1fr">
+              <button class="engine-btn ${a.engine === 'browser' ? 'active' : ''}" onclick="state.audio.engine='browser';render()">
+                <div class="t">🧠 In-browser AI</div>
+                <div class="s">Private · free · Whisper runs on your device</div>
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem">
+            <label class="label">AI model</label>
+            <div class="models">
+              ${WHISPER_MODELS.map(m => `
+                <button class="model-btn ${a.model === m.id ? 'active' : ''}" onclick="state.audio.model='${m.id}';render()">
+                  <div class="n">${m.name}</div>
+                  <div class="d">${m.note} · ${m.size}</div>
+                </button>
+              `).join('')}
+            </div>
+            <div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;font-size:0.875rem;color:var(--text)">
+              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+                <input type="checkbox" ${a.preferGpu ? 'checked' : ''} onchange="state.audio.preferGpu=this.checked" style="accent-color:var(--accent)"> GPU acceleration (WebGPU)
+              </label>
+              <label style="display:flex;align-items:center;gap:0.5rem">
+                Max chars / subtitle
+                <input type="number" min="30" max="200" value="${a.maxChars}" onchange="state.audio.maxChars=Math.max(30,Math.min(200,Number(this.value)||84))" class="input" style="width:5rem;padding:0.35rem 0.5rem">
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
+            ${busy
+              ? `<button class="btn btn-danger btn-block" onclick="cancelAudio()">✕ Cancel</button>`
+              : `<button class="btn btn-primary btn-block" onclick="runAudio()">✨ Generate Khmer Subtitles</button>`}
+          </div>
+        `}
+        ${a.errorMsg && a.phase !== 'error' ? `<div class="warn-box">${escapeHtml(a.errorMsg)}</div>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="section-title">Pipeline</div>
+        <div class="steps">
+          <div class="step ${stepState('decoding')}">
+            ${stepNum(1, stepState('decoding'))}
+            <div class="step-content">
+              <div class="step-title">Decode audio</div>
+            </div>
+          </div>
+          <div class="step ${stepState('loading')}">
+            ${stepNum(2, stepState('loading'))}
+            <div class="step-content">
+              <div class="step-title">Load AI model${a.device ? ` (${a.device === 'webgpu' ? 'GPU' : 'CPU'})` : ''}</div>
+              ${a.phase === 'loading' ? `
+                <div class="progress" style="margin-top:0.5rem">
+                  <div class="progress-label">
+                    <span class="title">Downloading model (cached after first use)</span>
+                    <span class="pct">${loadTotals.total ? `${fmtBytes(loadTotals.loaded)} / ${fmtBytes(loadTotals.total)}` : 'Preparing…'}</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill progress-shimmer" style="width:${loadTotals.total ? (loadTotals.loaded / loadTotals.total * 100) : 0}%"></div></div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+          <div class="step ${stepState('transcribing')}">
+            ${stepNum(3, stepState('transcribing'))}
+            <div class="step-content">
+              <div class="step-title">Transcribe speech</div>
+              ${a.phase === 'transcribing' ? `
+                <div class="progress" style="margin-top:0.5rem">
+                  <div class="progress-label">
+                    <span class="title">Listening…</span>
+                    <span class="pct">${Math.round(a.tProgress * 100)}%${eta ? ` · ~${formatShort(eta)} left` : ''}</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill progress-shimmer" style="width:${a.tProgress * 100}%"></div></div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+          <div class="step ${stepState('translating')}">
+            ${stepNum(4, stepState('translating'))}
+            <div class="step-content">
+              <div class="step-title">Translate to Khmer</div>
+              ${a.phase === 'translating' ? `
+                <div class="progress" style="margin-top:0.5rem">
+                  <div class="progress-label">
+                    <span class="title">Translating</span>
+                    <span class="pct">${a.trProgress.done} / ${a.trProgress.total}</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill progress-shimmer" style="width:${a.trProgress.total ? (a.trProgress.done / a.trProgress.total * 100) : 0}%"></div></div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        ${a.phase === 'error' ? `
+          <div class="error-box">
+            <strong>Something went wrong</strong>
+            ${escapeHtml(a.errorMsg)}
+          </div>
+        ` : ''}
+
+        <div style="margin-top:1.5rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+            <div class="section-title" style="margin:0">Live transcript</div>
+            ${a.live.length > 0 ? `<span class="chip">${a.live.length} lines</span>` : ''}
+          </div>
+          <div class="feed" id="live-feed">
+            ${a.live.length === 0 ? `
+              <div class="feed-empty">
+                <div>
+                  <div style="font-size:1.5rem;opacity:0.4;margin-bottom:0.5rem">🎵</div>
+                  Transcribed text will stream here in real time
+                  ${a.language !== 'auto' ? `<div style="font-size:0.75rem;margin-top:0.25rem">Spoken language: ${langName(a.language)}</div>` : ''}
+                </div>
+              </div>
+            ` : a.live.map(c => `
+              <div class="feed-line">
+                <span class="feed-time">${formatShort(c.start)}</span>
+                <span class="feed-text">${escapeHtml(c.text)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Wire dropzone
+  if (!a.file) {
+    const drop = document.getElementById('audio-drop');
+    const input = document.getElementById('audio-input');
+    drop.addEventListener('click', () => input.click());
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault(); drop.classList.remove('over');
+      const files = Array.from(e.dataTransfer.files);
+      if (files[0]) pickAudioFile(files[0]);
+    });
+    input.addEventListener('change', e => {
+      if (e.target.files[0]) pickAudioFile(e.target.files[0]);
+      e.target.value = '';
+    });
+  }
+
+  // Auto-scroll feed
+  const feed = document.getElementById('live-feed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+function pickAudioFile(f) {
+  state.audio.file = f;
+  state.audio.mediaUrl = URL.createObjectURL(f);
+  state.audio.mediaKind = f.type.startsWith('video') ? 'video' : 'audio';
+  state.audio.phase = 'idle';
+  state.audio.errorMsg = '';
+  state.audio.live = [];
+  render();
+}
+function clearAudio() {
+  state.audio.file = null;
+  state.audio.mediaUrl = null;
+  state.audio.phase = 'idle';
+  state.audio.errorMsg = '';
+  render();
+}
+function cancelAudio() {
+  state.audio.cancel = true;
+  killWorker();
+  state.audio.phase = 'idle';
+  state.audio.errorMsg = 'Cancelled.';
+  render();
+}
+
+/* Recording */
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const type = rec.mimeType || 'audio/webm';
+      const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+      const blob = new Blob(chunks, { type });
+      pickAudioFile(new File([blob], `recording-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`, { type }));
+    };
+    rec.start(250);
+    recRef = rec;
+    state.audio.recording = true;
+    state.audio.recSeconds = 0;
+    recTimer = setInterval(() => { state.audio.recSeconds++; render(); }, 1000);
+    render();
+  } catch {
+    toast('Microphone access denied or unavailable.');
+  }
+}
+function stopRecording() {
+  recRef?.stop(); recRef = null;
+  state.audio.recording = false;
+  if (recTimer) clearInterval(recTimer); recTimer = null;
+  render();
+}
+
+/* ============================================================
+   RENDERING — SRT TAB
+   ============================================================ */
+const SAMPLE_SRT = `1
+00:00:01,000 --> 00:00:03,500
+Hello everyone, welcome back to the channel.
+
+2
+00:00:03,800 --> 00:00:06,200
+Today we are going to visit Angkor Wat.
+
+3
+00:00:06,500 --> 00:00:09,000
+It is one of the most beautiful temples in the world.
+`;
+
+function renderSrt() {
+  const s = state.srt;
+  const el = document.getElementById('tab-srt');
+  const totalCues = s.items.reduce((sum, it) => sum + it.cues.length, 0);
+  const pending = s.items.filter(it => it.status !== 'done').length;
+  const doneItems = s.items.filter(it => it.status === 'done');
+
+  el.innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-icon cyan">📄</div>
+          <div>
+            <h2>Subtitle File → Khmer</h2>
+            <div class="sub">បកប្រែឯកសារ SRT ទៅជាភាសាខ្មែរ</div>
+          </div>
+        </div>
+
+        <div class="dropzone" id="srt-drop">
+          <input type="file" id="srt-input" accept=".srt,.vtt,.txt,text/plain,text/vtt" multiple hidden />
+          <div class="dropzone-icon">📄</div>
+          <div class="dropzone-title">Drop SRT / VTT files here</div>
+          <div class="dropzone-sub">Any language · multiple files supported · timings preserved</div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem">
+          <button class="btn btn-sm" onclick="state.srt.showPaste=!state.srt.showPaste;render()">
+            ${s.showPaste ? 'Hide paste box' : '📋 Paste subtitle text'}
+          </button>
+          <button class="btn btn-sm" onclick="state.srt.paste=\`${SAMPLE_SRT.replace(/`/g, '\\`').replace(/\n/g, '\\n')}\`;state.srt.showPaste=true;render()">
+            ✨ Try a sample
+          </button>
+        </div>
+
+        ${s.showPaste ? `
+          <div style="margin-top:0.75rem;display:flex;flex-direction:column;gap:0.5rem">
+            <textarea class="input" id="paste-area" placeholder="1&#10;00:00:01,000 --> 00:00:03,000&#10;Your subtitle text…">${escapeHtml(s.paste)}</textarea>
+            <button class="btn" onclick="state.srt.paste=document.getElementById('paste-area').value;addPaste()">➕ Add pasted subtitles</button>
+          </div>
+        ` : ''}
+
+        ${s.errorMsg ? `<div class="warn-box">${escapeHtml(s.errorMsg)}</div>` : ''}
+
+        ${s.items.length > 0 ? `
+          <div class="file-list">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="section-title" style="margin:0">Files (${s.items.length}) · ${totalCues} lines</div>
+              ${!s.running ? `<button class="btn btn-sm" onclick="state.srt.items=[];render()">Clear all</button>` : ''}
+            </div>
+            ${s.items.map((it, i) => `
+              <div class="file-item">
+                <div class="file-icon ${it.status === 'done' ? 'done' : it.status === 'error' ? 'err' : it.status === 'translating' ? 'busy' : 'pending'}">
+                  ${it.status === 'translating' ? '<span class="spinner"></span>' : it.status === 'done' ? '✓' : '📄'}
+                </div>
+                <div class="file-info">
+                  <div class="file-name">${escapeHtml(it.name)}</div>
+                  <div class="file-meta">
+                    ${it.cues.length} lines · ${formatShort(it.cues[it.cues.length - 1]?.end ?? 0)}
+                    ${it.detected ? ` · ${langName(it.detected)} → Khmer` : ''}
+                  </div>
+                </div>
+                <div class="file-actions">
+                  ${it.status === 'done' ? `
+                    <button class="btn btn-sm" onclick="downloadSrtItem(${i}, 'khmer')" title="Download Khmer SRT">⬇ SRT</button>
+                    <button class="btn btn-sm" onclick="openFromSrtItem(${i})">Edit</button>
+                  ` : ''}
+                  ${it.status !== 'done' && !s.running ? `<button class="file-remove" onclick="state.srt.items.splice(${i},1);render()">✕</button>` : ''}
+                </div>
+              </div>
+              ${it.status === 'translating' ? `
+                <div class="progress" style="margin-left:3rem">
+                  <div class="progress-bar"><div class="progress-fill progress-shimmer" style="width:${(it.done / it.cues.length * 100)}%"></div></div>
+                  <div class="progress-label" style="margin-top:0.25rem"><span class="pct">${it.done} / ${it.cues.length}</span></div>
+                </div>
+              ` : ''}
+              ${it.status === 'error' ? `<div class="error-box" style="margin-left:3rem">${escapeHtml(it.error || '')}</div>` : ''}
+            `).join('')}
+          </div>
+
+          ${doneItems.length > 0 ? `
+            <button class="btn btn-primary btn-block" style="margin-top:1.25rem" onclick="downloadAllSrtZip()">
+              📦 Download all Khmer SRT (ZIP)
+              <span style="font-weight:400;opacity:0.8;font-size:0.875rem">Translate-Sub-khmer.zip · ${doneItems.length} file${doneItems.length > 1 ? 's' : ''}</span>
+            </button>
+          ` : ''}
+        ` : ''}
+
+        <div class="field-grid" style="grid-template-columns:1fr auto;margin-top:1.5rem;align-items:end">
+          <div>
+            <label class="label">Subtitle language</label>
+            <select class="select" onchange="state.srt.source=this.value">
+              ${LANGUAGES.map(l => `<option value="${l.code}" ${l.code === s.source ? 'selected' : ''}>${l.flag} ${l.name}</option>`).join('')}
+            </select>
+          </div>
+          ${s.running
+            ? `<button class="btn btn-danger" onclick="state.srt.running=false;render()">✕ Stop</button>`
+            : `<button class="btn btn-primary" ${!pending ? 'disabled' : ''} onclick="runSrt()" style="white-space:nowrap">✨ Translate to Khmer</button>`}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Preview</div>
+        ${s.running && s.previewKm.length > 0 ? `
+          <div class="preview-panel">
+            ${s.previewKm.map(p => `
+              <div class="preview-item">
+                <div class="preview-orig">${escapeHtml(p.text)}</div>
+                <div class="preview-km">${escapeHtml(p.km)}</div>
+              </div>
+            `).join('')}
+          </div>
+        ` : s.items[0] ? `
+          <div class="preview-panel">
+            ${s.items[0].cues.slice(0, 8).map(c => `
+              <div class="preview-item">
+                <div style="display:flex;gap:0.75rem">
+                  <span style="font-family:'JetBrains Mono';font-size:0.7rem;color:#67e8f9;flex-shrink:0;padding-top:0.25rem">${formatShort(c.start)}</span>
+                  <div style="min-width:0">
+                    <div style="color:var(--text)">${escapeHtml(c.text)}</div>
+                    ${c.km ? `<div class="preview-km">${escapeHtml(c.km)}</div>` : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+            ${s.items[0].cues.length > 8 ? `<div style="text-align:center;font-size:0.75rem;color:var(--text-faint)">+ ${s.items[0].cues.length - 8} more lines</div>` : ''}
+          </div>
+        ` : `
+          <div class="empty">
+            <div class="empty-icon">ក</div>
+            <h3>Supports SRT &amp; WebVTT</h3>
+            <p>English, Chinese, Thai, Korean, Japanese, Vietnamese, French and 100+ more languages translated into natural Khmer.</p>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+
+  // Wire dropzone
+  const drop = document.getElementById('srt-drop');
+  const input = document.getElementById('srt-input');
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('over');
+    addSrtFiles(Array.from(e.dataTransfer.files));
+  });
+  input.addEventListener('change', e => {
+    addSrtFiles(Array.from(e.target.files));
+    e.target.value = '';
+  });
+}
+
+function downloadSrtItem(i, mode) {
+  const it = state.srt.items[i];
+  if (!it) return;
+  downloadFile(`${baseName(it.name)}.km.srt`, buildSrt(it.cues, mode), 'application/x-subrip');
+}
+function openFromSrtItem(i) {
+  const it = state.srt.items[i];
+  if (!it) return;
+  openEditor({ title: baseName(it.name), kind: 'srt', sourceLang: it.detected ?? 'auto', cues: it.cues });
+}
+async function downloadAllSrtZip() {
+  const doneItems = state.srt.items.filter(it => it.status === 'done');
+  await downloadZip(
+    doneItems.map(it => ({ name: `${baseName(it.name)}.km.srt`, content: buildSrt(it.cues, 'khmer') })),
+    'Translate-Sub-khmer.zip'
+  );
+}
+
+/* ============================================================
+   RENDERING — HISTORY
+   ============================================================ */
+function renderHistory() {
+  const h = state.history;
+  const el = document.getElementById('tab-history');
+  const list = h.list.filter(p => !h.q || p.title.toLowerCase().includes(h.q.toLowerCase()));
+
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+        <div class="card-head" style="margin:0">
+          <div class="card-icon amber">🕘</div>
+          <div>
+            <h2>Your subtitle library</h2>
+            <div class="sub">ប្រវត្តិការងាររបស់អ្នក</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <button class="btn" ${!list.length ? 'disabled' : ''} onclick="downloadHistoryZip()">📦 Download all (ZIP)</button>
+          <input class="input" placeholder="Search…" value="${escapeHtml(h.q)}" oninput="state.history.q=this.value;render()" style="width:14rem">
+        </div>
+      </div>
+
+      ${h.list.length === 0 ? `
+        <div class="empty">
+          <div style="font-size:3rem">🎬</div>
+          <h3>No subtitles yet</h3>
+          <p>Everything you create is saved here automatically.</p>
+          <button class="btn btn-primary" onclick="switchTab('audio')">✨ Create your first Khmer subtitles</button>
+        </div>
+      ` : list.length === 0 ? `
+        <div class="empty">
+          <h3>No matching projects</h3>
+          <p>Try a different search.</p>
+        </div>
+      ` : `
+        <div class="history-grid">
+          ${list.map(p => `
+            <div class="history-card">
+              <div class="history-head">
+                <div style="min-width:0;flex:1">
+                  <div class="history-title">${escapeHtml(p.title)}</div>
+                  <div class="history-date">${new Date(p.updatedAt).toLocaleString()}</div>
+                </div>
+                <div style="font-size:1.5rem">${p.kind === 'audio' ? '🎙️' : '📄'}</div>
+              </div>
+              <div class="chips" style="margin-top:0.75rem">
+                <span class="chip">${langName(p.sourceLang)} → ខ្មែរ</span>
+                <span class="chip">${p.cues.length} lines</span>
+                <span class="chip">${formatShort(p.cues[p.cues.length - 1]?.end ?? 0)}</span>
+              </div>
+              <div class="history-preview">
+                ${(p.cues.slice(0, 2).map(c => c.km || c.text).length)
+                  ? p.cues.slice(0, 2).map(c => `<p>${escapeHtml(c.km || c.text)}</p>`).join('')
+                  : `<p style="color:var(--text-faint)">Empty</p>`}
+              </div>
+              <div class="history-actions">
+                <button class="btn btn-primary" style="flex:1" onclick="openFromHistory('${p.id}')">Open editor</button>
+                <button class="btn" onclick="downloadHistoryItem('${p.id}')">⬇</button>
+                <button class="btn btn-danger" onclick="deleteHistoryItem('${p.id}')">🗑</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function openFromHistory(id) {
+  const p = getProject(id);
+  if (!p) return;
+  openEditor({ id: p.id, title: p.title, kind: p.kind, sourceLang: p.sourceLang, cues: p.cues });
+}
+function downloadHistoryItem(id) {
+  const p = getProject(id);
+  if (!p) return;
+  downloadFile(`${p.title}.km.srt`, buildSrt(p.cues, 'khmer'), 'application/x-subrip');
+}
+function deleteHistoryItem(id) {
+  if (!confirm('Delete this subtitle project?')) return;
+  deleteProject(id);
+  render();
+}
+async function downloadHistoryZip() {
+  const h = state.history;
+  const list = h.list.filter(p => !h.q || p.title.toLowerCase().includes(h.q.toLowerCase()));
+  if (!list.length) return;
+  await downloadZip(
+    list.map(p => ({ name: `${p.title}.km.srt`, content: buildSrt(p.cues, 'khmer') })),
+    'Translate-Sub-khmer.zip'
+  );
+}
+
+/* ============================================================
+   RENDERING — EDITOR
+   ============================================================ */
+function renderEditor() {
+  const ed = state.editor;
+  if (!ed) return;
+  const el = document.getElementById('editor-view');
+
+  // find active cue
+  const findActive = () => {
+    if (!mediaEl) return -1;
+    const t = mediaEl.currentTime;
+    let lo = 0, hi = ed.cues.length - 1, found = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (ed.cues[mid].end <= t) lo = mid + 1;
+      else if (ed.cues[mid].start > t) hi = mid - 1;
+      else { found = mid; break; }
+    }
+    return found;
+  };
+  activeCueIdx = findActive();
+  const active = activeCueIdx >= 0 ? ed.cues[activeCueIdx] : null;
+
+  const filtered = ed.cues
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => !editorQuery || c.text.toLowerCase().includes(editorQuery.toLowerCase()) || c.km.toLowerCase().includes(editorQuery.toLowerCase()));
+
+  const duration = ed.cues.length ? ed.cues[ed.cues.length - 1].end : 0;
+  const translated = ed.cues.filter(c => c.km.trim()).length;
+  const name = ed.title || 'subtitles';
+
+  const subtitleHtml = active ? `
+    <div class="km" style="font-size:${editorFontSize}px">${escapeHtml(active.km || active.text)}</div>
+    ${editorDisplay === 'bilingual' && active.km ? `<div class="orig" style="font-size:${editorFontSize * 0.62}px">${escapeHtml(active.text)}</div>` : ''}
+  ` : '';
+
+  el.innerHTML = `
+    <div class="editor-head">
+      <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;flex:1">
+        <button class="btn btn-icon" onclick="goHome()" title="Back">←</button>
+        <div style="min-width:0;flex:1">
+          <input class="editor-title" value="${escapeHtml(ed.title)}" oninput="state.editor.title=this.value;scheduleSave()" />
+          <div class="chips" style="margin-top:0.25rem;padding:0 0.25rem">
+            <span class="chip">${ed.kind === 'audio' ? '🎙️ From speech' : '📄 From SRT'}</span>
+            <span class="chip">${langName(ed.sourceLang)} → <span class="font-khmer">ខ្មែរ</span></span>
+            <span class="chip">${ed.cues.length} lines</span>
+            <span class="chip">🕐 ${formatShort(duration)}</span>
+            <span class="chip">${translated}/${ed.cues.length} translated</span>
+            <span style="font-size:0.75rem;color:var(--text-faint);margin-left:0.5rem">
+              ${editorSaveState === 'saving' ? '<span class="spinner"></span> Saving…' : editorSaveState === 'saved' ? '✓ Saved' : editorSaveState === 'error' ? '<span style="color:#fda4af">Save failed</span>' : ''}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+        <button class="btn btn-primary" onclick="downloadEditor('khmer')">⬇ Download Khmer SRT</button>
+        <button class="btn" onclick="downloadEditorZip()" title="All formats as Translate-Sub-khmer.zip">📦 All formats (ZIP)</button>
+      </div>
+    </div>
+
+    <div class="editor-grid">
+      <div class="editor-left" style="display:flex;flex-direction:column;gap:1.5rem">
+        <div class="card" style="padding:0;overflow:hidden">
+          ${ed.mediaUrl
+            ? (ed.mediaKind === 'video'
+              ? `<div class="video-preview">
+                   <video id="editor-media" src="${ed.mediaUrl}" controls></video>
+                   ${active ? `<div class="video-subtitles">${subtitleHtml}</div>` : ''}
+                 </div>`
+              : `<div class="audio-preview">
+                   <div class="audio-fake">
+                     <div class="audio-fake-content">
+                       ${active ? `
+                         <div class="km" style="font-size:${editorFontSize}px">${escapeHtml(active.km || active.text)}</div>
+                         ${editorDisplay === 'bilingual' && active.km ? `<div class="orig" style="font-size:${editorFontSize * 0.6}px">${escapeHtml(active.text)}</div>` : ''}
+                       ` : `<div style="font-size:0.875rem;color:var(--text-dim)">▶ Press play to preview Khmer subtitles</div>`}
+                     </div>
+                   </div>
+                   <audio id="editor-media" src="${ed.mediaUrl}" controls style="width:100%"></audio>
+                 </div>`)
+            : `<div style="padding:1.5rem;text-align:center">
+                 <div style="width:56px;height:56px;margin:0 auto 0.75rem;border-radius:16px;background:rgba(255,255,255,0.05);border:1px solid var(--border-2);display:grid;place-items:center">🎬</div>
+                 <div style="font-weight:600;color:white">Preview with your video</div>
+                 <div style="font-size:0.875rem;color:var(--text-dim);margin-top:0.25rem">Attach the matching video or audio to watch Khmer subtitles in sync.</div>
+                 <button class="btn" style="margin-top:1rem" onclick="document.getElementById('attach-media').click()">⬆ Attach media</button>
+               </div>`
+          }
+          <input type="file" id="attach-media" accept="audio/*,video/*" hidden />
+          ${ed.mediaUrl ? `
+            <div class="media-controls">
+              <div class="toggle-group">
+                <button class="toggle-btn ${editorDisplay === 'khmer' ? 'active' : ''}" onclick="editorDisplay='khmer';render()">khmer</button>
+                <button class="toggle-btn ${editorDisplay === 'bilingual' ? 'active' : ''}" onclick="editorDisplay='bilingual';render()">bilingual</button>
+              </div>
+              <label style="display:flex;align-items:center;gap:0.5rem">
+                Size
+                <input type="range" min="14" max="44" value="${editorFontSize}" oninput="editorFontSize=+this.value;render()" style="accent-color:var(--accent)">
+              </label>
+              <label style="display:flex;align-items:center;gap:0.375rem;cursor:pointer">
+                <input type="checkbox" ${editorFollow ? 'checked' : ''} onchange="editorFollow=this.checked" style="accent-color:var(--accent)"> Auto-scroll
+              </label>
+              <button style="margin-left:auto;background:none;border:0;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:0.75rem" onclick="document.getElementById('attach-media').click()">Change media</button>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="card">
+          <div class="section-title">Export</div>
+          <div class="export-grid">
+            <button class="export-btn primary" onclick="downloadEditor('khmer')">
+              <div class="t">⬇ Khmer SRT</div><div class="s">.km.srt</div>
+            </button>
+            <button class="export-btn" onclick="downloadEditor('bilingual')">
+              <div class="t">⬇ Bilingual SRT</div><div class="s">Khmer + original</div>
+            </button>
+            <button class="export-btn" onclick="downloadEditor('original')">
+              <div class="t">⬇ Original SRT</div><div class="s">${langName(ed.sourceLang)}</div>
+            </button>
+            <button class="export-btn" onclick="downloadEditorVtt()">
+              <div class="t">⬇ Khmer VTT</div><div class="s">for web players</div>
+            </button>
+            <button class="export-btn" onclick="downloadEditorTxt()">
+              <div class="t">⬇ Khmer TXT</div><div class="s">transcript</div>
+            </button>
+            <button class="export-btn primary" onclick="downloadEditorZip()">
+              <div class="t">📦 All formats ZIP</div><div class="s">Translate-Sub-khmer.zip</div>
+            </button>
+            <button class="export-btn" onclick="copyEditorText()">
+              <div class="t">📋 Copy text</div><div class="s">to clipboard</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="card tool-section">
+          <div class="section-title">Tools</div>
+          <div>
+            <label class="label">Shift all timings (seconds)</label>
+            <div style="display:flex;gap:0.5rem">
+              <button class="btn" onclick="shiftCues(-1)">− Earlier</button>
+              <input class="input" id="shift-input" value="0.5" style="text-align:center" inputmode="decimal">
+              <button class="btn" onclick="shiftCues(1)">+ Later</button>
+            </div>
+          </div>
+          <div>
+            <label class="label">Source language</label>
+            <select class="select" onchange="state.editor.sourceLang=this.value;scheduleSave()">
+              ${LANGUAGES.map(l => `<option value="${l.code}" ${l.code === ed.sourceLang ? 'selected' : ''}>${l.flag} ${l.name}</option>`).join('')}
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+            <button class="btn btn-sm" onclick="retranslateBulk(true)">✨ Translate missing</button>
+            <button class="btn btn-sm" onclick="retranslateBulk(false)">🔄 Re-translate all</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cue-list">
+        <div class="cue-search">
+          <input class="input" placeholder="Search subtitles…" value="${escapeHtml(editorQuery)}" oninput="editorQuery=this.value;render()" />
+          <span class="chip">${filtered.length}/${ed.cues.length}</span>
+        </div>
+        <div class="cue-scroll" id="cue-scroll">
+          ${filtered.length === 0 ? `<div style="padding:2.5rem;text-align:center;color:var(--text-faint);font-size:0.875rem">No subtitles match "${escapeHtml(editorQuery)}".</div>` :
+            filtered.map(({ c, i }) => `
+              <div class="cue-row ${i === activeCueIdx ? 'active' : ''}" data-idx="${i}">
+                <div class="cue-num">
+                  <span class="n">${i + 1}</span>
+                  ${ed.mediaUrl ? `<button class="cue-play" onclick="seekTo(${c.start})">▶</button>` : ''}
+                </div>
+                <div class="cue-body">
+                  <div class="cue-times">
+                    <input class="cue-time" value="${formatTime(c.start)}" onblur="updateTime(${i},'start',this.value)">
+                    <span>→</span>
+                    <input class="cue-time" value="${formatTime(c.end)}" onblur="updateTime(${i},'end',this.value)">
+                    <span class="cue-duration">${(c.end - c.start).toFixed(1)}s</span>
+                    <div class="cue-actions">
+                      <button class="cue-act" onclick="retranslateCue(${i})" title="Re-translate">🔄</button>
+                      <button class="cue-act" onclick="insertAfter(${i})" title="Insert line after">➕</button>
+                      ${i < ed.cues.length - 1 ? `<button class="cue-act" onclick="mergeNext(${i})" title="Merge with next" style="font-size:0.6rem;font-weight:700;padding:0.375rem 0.5rem">MERGE</button>` : ''}
+                      <button class="cue-act danger" onclick="deleteCue(${i})" title="Delete">🗑</button>
+                    </div>
+                  </div>
+                  <textarea class="cue-orig" rows="1" oninput="updateCueText(${i},'text',this.value);autoResize(this)" placeholder="Original text">${escapeHtml(c.text)}</textarea>
+                  <textarea class="cue-km ${c.km ? '' : 'empty'}" rows="1" oninput="updateCueText(${i},'km',this.value);autoResize(this)" placeholder="ការបកប្រែជាភាសាខ្មែរ…">${escapeHtml(c.km)}</textarea>
+                </div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Wire media element
+  const m = document.getElementById('editor-media');
+  if (m && m !== mediaEl) {
+    mediaEl = m;
+    m.addEventListener('timeupdate', () => {
+      const idx = findActive();
+      if (idx !== activeCueIdx) {
+        activeCueIdx = idx;
+        render();
+      }
+    });
+  }
+
+  // Wire attach
+  const attach = document.getElementById('attach-media');
+  if (attach) attach.addEventListener('change', e => {
+    const f = e.target.files?.[0];
+    if (f) {
+      state.editor.mediaUrl = URL.createObjectURL(f);
+      state.editor.mediaKind = f.type.startsWith('audio') ? 'audio' : 'video';
+      render();
+    }
+  });
+
+  // Auto-resize textareas
+  el.querySelectorAll('textarea.cue-orig, textarea.cue-km').forEach(autoResize);
+
+  // Auto-scroll to active
+  if (editorFollow && activeCueIdx >= 0 && mediaEl && !mediaEl.paused) {
+    const row = document.querySelector(`[data-idx="${activeCueIdx}"]`);
+    row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+function autoResize(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+}
+
+/* Editor actions */
+function updateCueText(i, field, value) {
+  state.editor.cues[i][field] = value;
+  scheduleSave();
+}
+function updateTime(i, field, value) {
+  const v = parseTime(value);
+  if (!Number.isFinite(v) || v < 0) { render(); return; }
+  state.editor.cues[i][field] = v;
+  scheduleSave();
+  render();
+}
+function seekTo(t) {
+  if (mediaEl) { mediaEl.currentTime = t + 0.01; mediaEl.play().catch(() => {}); }
+}
+function shiftCues(sign) {
+  const d = (parseFloat(document.getElementById('shift-input')?.value) || 0) * sign;
+  state.editor.cues.forEach(c => {
+    c.start = Math.max(0, c.start + d);
+    c.end = Math.max(0, c.end + d);
+  });
+  toast(`Shifted all subtitles ${d > 0 ? '+' : ''}${d}s`);
+  scheduleSave();
+  render();
+}
+function insertAfter(i) {
+  const c = state.editor.cues[i];
+  const nextStart = state.editor.cues[i + 1]?.start ?? c.end + 2;
+  const start = c.end;
+  const end = Math.max(start + 0.5, Math.min(nextStart, start + 2));
+  state.editor.cues.splice(i + 1, 0, { start, end, text: '', km: '' });
+  scheduleSave();
+  render();
+}
+function mergeNext(i) {
+  const ed = state.editor;
+  if (i >= ed.cues.length - 1) return;
+  const a = ed.cues[i], b = ed.cues[i + 1];
+  ed.cues.splice(i, 2, { start: a.start, end: b.end, text: `${a.text} ${b.text}`.trim(), km: `${a.km} ${b.km}`.trim() });
+  scheduleSave();
+  render();
+}
+function deleteCue(i) {
+  state.editor.cues.splice(i, 1);
+  scheduleSave();
+  render();
+}
+async function retranslateCue(i) {
+  const c = state.editor.cues[i];
+  try {
+    const r = await translateBatch([c.text.replace(/\s*\n\s*/g, ' ')], toGoogle(state.editor.sourceLang), 'km');
+    c.km = r.texts[0] ?? '';
+    scheduleSave();
+    render();
+  } catch {
+    toast('Translation failed — try again');
+  }
+}
+async function retranslateBulk(onlyMissing) {
+  const ed = state.editor;
+  const idxs = ed.cues.map((c, i) => i).filter(i => !onlyMissing || !ed.cues[i].km.trim());
+  if (!idxs.length) { toast('Everything is already translated ✓'); return; }
+  try {
+    const r = await translateAll(
+      idxs.map(i => ed.cues[i].text),
+      { source: toGoogle(ed.sourceLang), target: 'km', onProgress: (d, t) => toast(`Translating ${d}/${t}…`) }
+    );
+    idxs.forEach((idx, k) => (ed.cues[idx].km = r.texts[k] || ed.cues[idx].km));
+    toast(`Translated ${idxs.length} lines`);
+    scheduleSave();
+    render();
+  } catch {
+    toast('Translation failed — please retry');
+  }
+}
+
+function downloadEditor(mode) {
+  const ed = state.editor;
+  const name = ed.title || 'subtitles';
+  if (mode === 'khmer') downloadFile(`${name}.km.srt`, buildSrt(ed.cues, 'khmer'), 'application/x-subrip');
+  else if (mode === 'bilingual') downloadFile(`${name}.km-dual.srt`, buildSrt(ed.cues, 'bilingual'), 'application/x-subrip');
+  else if (mode === 'original') downloadFile(`${name}.${ed.sourceLang}.srt`, buildSrt(ed.cues, 'original'), 'application/x-subrip');
+}
+function downloadEditorVtt() {
+  const ed = state.editor;
+  downloadFile(`${ed.title || 'subtitles'}.km.vtt`, buildVtt(ed.cues, 'khmer'), 'text/vtt');
+}
+function downloadEditorTxt() {
+  const ed = state.editor;
+  downloadFile(`${ed.title || 'subtitles'}.km.txt`, buildPlainText(ed.cues, 'khmer'));
+}
+async function downloadEditorZip() {
+  const ed = state.editor;
+  const name = ed.title || 'subtitles';
+  await downloadZip([
+    { name: `${name}.km.srt`, content: buildSrt(ed.cues, 'khmer') },
+    { name: `${name}.km-dual.srt`, content: buildSrt(ed.cues, 'bilingual') },
+    { name: `${name}.${ed.sourceLang}.srt`, content: buildSrt(ed.cues, 'original') },
+    { name: `${name}.km.vtt`, content: buildVtt(ed.cues, 'khmer') },
+    { name: `${name}.km.txt`, content: buildPlainText(ed.cues, 'khmer') },
+  ], 'Translate-Sub-khmer.zip');
+}
+async function copyEditorText() {
+  try {
+    await navigator.clipboard.writeText(buildPlainText(state.editor.cues, 'khmer'));
+    toast('Khmer text copied');
+  } catch { toast('Copy failed'); }
+}
+
+function scheduleSave() {
+  if (!state.editor?.id) return;
+  editorSaveState = 'saving';
+  if (editorSaveTimer) clearTimeout(editorSaveTimer);
+  editorSaveTimer = setTimeout(() => {
+    try {
+      updateProject(state.editor.id, {
+        title: state.editor.title, sourceLang: state.editor.sourceLang, cues: state.editor.cues,
+      });
+      editorSaveState = 'saved';
+    } catch {
+      editorSaveState = 'error';
+    }
+    if (state.view === 'editor') renderEditor();
+  }, 900);
+}
+
+/* ============================================================
+   MAIN RENDER
+   ============================================================ */
+function render() {
+  // Tab buttons
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === state.tab);
+  });
+
+  // Views
+  const homeView = document.getElementById('home-view');
+  const editorView = document.getElementById('editor-view');
+  if (state.view === 'editor') {
+    homeView.hidden = true;
+    editorView.hidden = false;
+    renderEditor();
+    return;
+  }
+  homeView.hidden = false;
+  editorView.hidden = true;
+
+  // Tab panels
+  const tabs = ['audio', 'srt', 'history'];
+  tabs.forEach(t => {
+    const panel = document.getElementById('tab-' + t);
+    panel.hidden = t !== state.tab;
+  });
+
+  if (state.tab === 'audio') renderAudio();
+  else if (state.tab === 'srt') renderSrt();
+  else if (state.tab === 'history') renderHistory();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  loadHistory();
+  render();
+});
+window.addEventListener('beforeunload', () => {
+  killWorker();
+  if (recTimer) clearInterval(recTimer);
+});
+</script>
+</body>
+</html>

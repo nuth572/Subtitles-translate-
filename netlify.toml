@@ -1,0 +1,21 @@
+[build]
+  publish = "."
+  command = ""
+
+# Serve index.html for the root path
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+
+# Cache the static app shell but always serve fresh HTML
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/whisper-worker.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Content-Type = "application/javascript"

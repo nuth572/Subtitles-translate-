@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Share KhmerSub AI</title>
+<meta name="description" content="Share KhmerSub AI with anyone — click the link to open it in your browser." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { color-scheme: dark; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #06060f;
+    color: #e2e8f0;
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: 2rem 1rem;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before, body::after {
+    content: ''; position: fixed; width: 60vmax; height: 60vmax;
+    border-radius: 50%; filter: blur(120px); opacity: 0.3;
+    z-index: -1; pointer-events: none;
+    animation: float 28s ease-in-out infinite alternate;
+  }
+  body::before { background: radial-gradient(circle, #8b5cf6, transparent 65%); top: -25vmax; left: -20vmax; }
+  body::after  { background: radial-gradient(circle, #06b6d4, transparent 65%); bottom: -25vmax; right: -20vmax; animation-delay: -10s; }
+  @keyframes float {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(8vmax, 6vmax) scale(1.15); }
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  .hero { text-align: center; margin-bottom: 2.5rem; }
+  .logo {
+    width: 80px; height: 80px;
+    margin: 0 auto 1.25rem;
+    border-radius: 24px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6, #06b6d4);
+    font-family: 'Kantumruy Pro', sans-serif;
+    font-weight: 700; font-size: 2.5rem; color: white;
+    box-shadow: 0 20px 60px rgba(139, 92, 246, 0.5);
+  }
+  h1 {
+    font-size: clamp(1.75rem, 5vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 0.75rem;
+    color: white;
+  }
+  h1 .grad {
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .subtitle { color: #94a3b8; font-size: 1.0625rem; max-width: 500px; margin: 0 auto; }
+  .font-khmer { font-family: 'Kantumruy Pro', sans-serif; }
+
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: 2rem;
+    backdrop-filter: blur(12px);
+    margin-bottom: 1.5rem;
+  }
+
+  .open-btn {
+    display: block;
+    width: 100%;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 20px;
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #06b6d4);
+    color: white;
+    text-decoration: none;
+    text-align: center;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.4);
+    transition: all 0.25s;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .open-btn:hover { transform: translateY(-2px); box-shadow: 0 20px 50px rgba(139, 92, 246, 0.6); filter: brightness(1.1); }
+  .open-btn .big { display: block; font-size: 1.25rem; margin-bottom: 0.25rem; }
+  .open-btn .small { display: block; font-size: 0.875rem; font-weight: 500; opacity: 0.9; }
+
+  .url-box {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .url-text {
+    flex: 1; min-width: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: #c4b5fd;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    user-select: all;
+  }
+  .copy-btn {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: white;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { background: rgba(168, 85, 247, 0.35); }
+  .copy-btn.copied { background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); }
+
+  .qr-section {
+    text-align: center;
+    padding: 1.5rem 0 0.5rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .qr-title {
+    font-size: 0.75rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: #94a3b8;
+    margin-bottom: 1rem;
+  }
+  #qrcode {
+    display: inline-block;
+    padding: 1rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  #qrcode img { display: block; }
+  .qr-caption { margin-top: 0.75rem; font-size: 0.8125rem; color: #94a3b8; }
+
+  h2 {
+    font-size: 1.25rem; font-weight: 700;
+    margin-bottom: 1rem;
+    color: white;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+
+  .steps { list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 3rem;
+    margin-bottom: 1.25rem;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 2rem; height: 2rem;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(6, 182, 212, 0.2));
+    border: 1px solid rgba(255,255,255,0.15);
+    color: white;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+  .steps strong { color: white; }
+  .steps a { color: #c4b5fd; text-decoration: none; border-bottom: 1px dashed #c4b5fd; }
+  .steps a:hover { border-bottom-style: solid; }
+
+  code {
+    background: rgba(255,255,255,0.08);
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: #fcd34d;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .callout {
+    padding: 1rem 1.25rem;
+    border-radius: 14px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #a7f3d0;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+  .callout strong { color: inherit; display: block; margin-bottom: 0.25rem; }
+
+  .alt-options {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  @media (min-width: 500px) { .alt-options { grid-template-columns: 1fr 1fr; } }
+  .alt-card {
+    padding: 1rem;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+    display: block;
+  }
+  .alt-card:hover { background: rgba(255,255,255,0.07); border-color: rgba(168, 85, 247, 0.4); transform: translateY(-2px); }
+  .alt-card .n { font-weight: 600; color: white; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  .alt-card .d { font-size: 0.8125rem; color: #94a3b8; }
+
+  /* Contact card */
+  .contact-card {
+    background: linear-gradient(135deg, rgba(34, 158, 217, 0.12), rgba(139, 92, 246, 0.08));
+    border-color: rgba(34, 158, 217, 0.3);
+  }
+  .tg-big-btn {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #229ED9, #1e88c7);
+    color: white;
+    text-decoration: none;
+    transition: all 0.25s;
+    box-shadow: 0 10px 30px rgba(34, 158, 217, 0.35);
+    margin-bottom: 1.5rem;
+  }
+  .tg-big-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(34, 158, 217, 0.55);
+    background: linear-gradient(135deg, #2bb0ed, #229ED9);
+  }
+  .tg-big-btn svg { flex-shrink: 0; }
+  .tg-big-title { display: block; font-weight: 700; font-size: 1.0625rem; }
+  .tg-big-sub { display: block; font-size: 0.8125rem; opacity: 0.9; margin-top: 0.15rem; }
+
+  .contact-features {
+    display: grid; gap: 0.75rem;
+  }
+  @media (min-width: 500px) { .contact-features { grid-template-columns: 1fr 1fr; } }
+  .contact-feat {
+    display: flex; gap: 0.75rem; align-items: flex-start;
+    padding: 0.875rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+  }
+  .contact-feat-ic { font-size: 1.5rem; flex-shrink: 0; }
+  .contact-feat-t { font-weight: 600; color: white; font-size: 0.9rem; }
+  .contact-feat-d { font-size: 0.8125rem; color: #94a3b8; margin-top: 0.125rem; }
+
+  footer {
+    margin-top: 3rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.8125rem;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%);
+    padding: 0.75rem 1.25rem;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.875rem;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    animation: slide-up 0.3s ease-out;
+  }
+  @keyframes slide-up {
+    from { transform: translate(-50%, 20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="logo font-khmer">ក</div>
+    <h1>Share <span class="grad">KhmerSub AI</span></h1>
+    <p class="subtitle">Click the button below to open the app — it runs entirely in your browser, no install needed.</p>
+    <p class="subtitle font-khmer" style="margin-top:0.25rem;font-size:0.9rem;color:#64748b">ចុចខាងក្រោមដើម្បីបើកកម្មវិធី</p>
+  </div>
+
+  <div class="card">
+    <a href="index.html" class="open-btn" id="open-btn">
+      <span class="big">▶ Open KhmerSub AI</span>
+      <span class="small">Click to launch the app in your browser</span>
+    </a>
+
+    <div class="url-box">
+      <span class="url-text" id="url-text">Loading…</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyLink()">📋 Copy</button>
+    </div>
+
+    <div class="qr-section">
+      <div class="qr-title">📱 Scan with your phone</div>
+      <div id="qrcode"></div>
+      <div class="qr-caption">Point your phone camera at this code to open the app</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🌐 Want a permanent link?</h2>
+    <p style="color:#94a3b8;margin-bottom:1rem">
+      The current URL is temporary. Get a permanent URL that works forever in 2 minutes, for free:
+    </p>
+    <ol class="steps">
+      <li>
+        <strong>Download these 2 files</strong> from this project:
+        <br/><code>index.html</code> and <code>whisper-worker.js</code>
+      </li>
+      <li>
+        <strong>Go to <a href="https://app.netlify.com/drop" target="_blank" rel="noopener">app.netlify.com/drop</a></strong>
+        (no account needed)
+      </li>
+      <li>
+        <strong>Drag the 2 files</strong> into the drop zone on that page
+      </li>
+      <li>
+        <strong>Get your permanent URL</strong> like <code>random-name-12345.netlify.app</code> — share it anywhere, it works forever!
+      </li>
+    </ol>
+
+    <div class="callout">
+      <strong>💡 Tip</strong>
+      <code>index.html</code> is the main app, so your URL becomes just <code>your-name.netlify.app</code> — no extra path needed. You can also upload <code>share.html</code> to get a pretty share page at <code>your-name.netlify.app/share.html</code>.
+    </div>
+
+    <div class="alt-options">
+      <a href="https://vercel.com/new" target="_blank" rel="noopener" class="alt-card">
+        <div class="n">▲ Vercel</div>
+        <div class="d">Free, auto HTTPS, custom domains</div>
+      </a>
+      <a href="https://pages.cloudflare.com" target="_blank" rel="noopener" class="alt-card">
+        <div class="n">☁️ Cloudflare Pages</div>
+        <div class="d">Fast global CDN, unlimited bandwidth</div>
+      </a>
+      <a href="https://github.com" target="_blank" rel="noopener" class="alt-card">
+        <div class="n">🐙 GitHub Pages</div>
+        <div class="d">Free if your repo is public</div>
+      </a>
+      <a href="deployment.html" target="_blank" rel="noopener" class="alt-card">
+        <div class="n">📖 Full guide</div>
+        <div class="d">All hosting options explained</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1.5rem">
+    <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:0.5rem">Or just copy the link above and paste it anywhere:</p>
+    <p style="color:#64748b;font-size:0.8125rem">
+      💬 WhatsApp · 📧 Email · 🐦 Twitter · 📘 Facebook · 📝 Documents
+    </p>
+    <p style="margin-top:0.75rem;color:#64748b;font-size:0.8125rem">
+      When anyone clicks it, the app opens automatically in their browser.
+    </p>
+  </div>
+
+  <div class="card contact-card">
+    <h2>💬 Contact the Owner</h2>
+    <p style="color:#94a3b8;margin-bottom:1rem">
+      Have a bug to report? A feature suggestion? Or just want to say hi?
+      <br/>Message me directly on Telegram — I'd love to hear from you!
+    </p>
+    <a href="https://t.me/Nuthkna" target="_blank" rel="noopener" class="tg-big-btn">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+        <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+      </svg>
+      <span>
+        <span class="tg-big-title">Message @Nuthkna on Telegram</span>
+        <span class="tg-big-sub">Report bugs · Share suggestions · Get help</span>
+      </span>
+    </a>
+    <div class="contact-features">
+      <div class="contact-feat">
+        <div class="contact-feat-ic">🐛</div>
+        <div>
+          <div class="contact-feat-t">Report a Bug</div>
+          <div class="contact-feat-d">Found something broken? Let me know</div>
+        </div>
+      </div>
+      <div class="contact-feat">
+        <div class="contact-feat-ic">💡</div>
+        <div>
+          <div class="contact-feat-t">Feature Suggestions</div>
+          <div class="contact-feat-d">Have an idea? I'd love to hear it</div>
+        </div>
+      </div>
+      <div class="contact-feat">
+        <div class="contact-feat-ic">🤝</div>
+        <div>
+          <div class="contact-feat-t">Collaborate</div>
+          <div class="contact-feat-d">Want to contribute? Let's chat</div>
+        </div>
+      </div>
+      <div class="contact-feat">
+        <div class="contact-feat-ic">❓</div>
+        <div>
+          <div class="contact-feat-t">Need Help?</div>
+          <div class="contact-feat-d">Happy to answer your questions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>KhmerSub AI · <span class="font-khmer">សូមអរគុណ</span> · Made with ❤️ for the Khmer community</p>
+    <p style="margin-top:0.5rem">
+      <a href="https://t.me/Nuthkna" target="_blank" rel="noopener" style="color:#7dd3fc">
+        📬 Contact owner: @Nuthkna on Telegram
+      </a>
+    </p>
+  </footer>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+  const appUrl = new URL('index.html', window.location.href).toString();
+
+  // Display the URL
+  document.getElementById('url-text').textContent = appUrl;
+
+  // Generate QR code
+  new QRCode(document.getElementById('qrcode'), {
+    text: appUrl,
+    width: 200,
+    height: 200,
+    colorDark: '#0f0f1f',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H,
+  });
+
+  function copyLink() {
+    const btn = document.getElementById('copy-btn');
+    navigator.clipboard.writeText(appUrl).then(() => {
+      btn.classList.add('copied');
+      btn.textContent = '✓ Copied!';
+      showToast('🔗 Link copied — paste it anywhere to share!');
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = '📋 Copy';
+      }, 2200);
+    }).catch(() => {
+      // Fallback for older browsers
+      window.prompt('Copy this link:', appUrl);
+    });
+  }
+
+  function showToast(msg) {
+    const c = document.getElementById('toast-container');
+    c.innerHTML = `<div class="toast">${msg}</div>`;
+    setTimeout(() => { c.innerHTML = ''; }, 2500);
+  }
+</script>
+</body>
+</html>

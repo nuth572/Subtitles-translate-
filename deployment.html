@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hosting KhmerSub AI — Deployment Guide</title>
+<meta name="description" content="Complete guide to deploying KhmerSub AI on Vercel, Railway, Fly.io, Docker, or any VPS." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #06060f;
+    --bg-2: #0b0b18;
+    --card: rgba(255, 255, 255, 0.04);
+    --card-hover: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-2: rgba(255, 255, 255, 0.14);
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #a855f7;
+    --accent-2: #06b6d4;
+    --accent-3: #ec4899;
+    --success: #10b981;
+    --warn: #f59e0b;
+    --danger: #f43f5e;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  .font-khmer { font-family: 'Kantumruy Pro', sans-serif; }
+  code, pre { font-family: 'JetBrains Mono', 'Menlo', monospace; }
+
+  /* Aurora background */
+  body::before, body::after {
+    content: '';
+    position: fixed;
+    width: 60vmax;
+    height: 60vmax;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.3;
+    z-index: -1;
+    pointer-events: none;
+    animation: float 28s ease-in-out infinite alternate;
+  }
+  body::before { background: radial-gradient(circle, #8b5cf6, transparent 65%); top: -25vmax; left: -20vmax; }
+  body::after  { background: radial-gradient(circle, #06b6d4, transparent 65%); bottom: -25vmax; right: -20vmax; animation-delay: -10s; }
+  @keyframes float {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(8vmax, 6vmax) scale(1.15); }
+  }
+  body .grid-bg {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.25rem 6rem; }
+  header.hero {
+    padding: 3rem 0 2rem;
+    text-align: center;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .brand-logo {
+    width: 44px; height: 44px;
+    border-radius: 14px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6, #06b6d4);
+    font-family: 'Kantumruy Pro';
+    font-weight: 700;
+    font-size: 22px;
+    color: white;
+    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+  }
+  .brand-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+  .brand-name .grad {
+    background: linear-gradient(90deg, #ec4899, #06b6d4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin: 0 0 1rem;
+    line-height: 1.1;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: var(--text-dim); font-size: 1.125rem; max-width: 700px; margin: 0 auto; }
+  .hero .badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 1rem; border-radius: 999px;
+    background: rgba(168, 85, 247, 0.12);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: #d8b4fe;
+    font-size: 0.85rem; font-weight: 500;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 3rem;
+    margin-top: 3rem;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 2rem; }
+    .toc { display: none; }
+  }
+
+  /* TOC */
+  .toc {
+    position: sticky;
+    top: 2rem;
+    align-self: start;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  .toc h3 {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text-faint); margin: 0 0 0.75rem;
+  }
+  .toc a {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    margin: 0.1rem 0;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.88rem;
+    border-radius: 8px;
+    border-left: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .toc a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .toc a.active {
+    color: white;
+    background: rgba(168, 85, 247, 0.12);
+    border-left-color: var(--accent);
+  }
+
+  /* Sections */
+  section { margin-bottom: 4rem; scroll-margin-top: 2rem; }
+  h2 {
+    font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em;
+    margin: 0 0 1.25rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  h2 .icon {
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(6, 182, 212, 0.15));
+    border: 1px solid var(--border-2);
+    font-size: 1.2rem;
+  }
+  h3 {
+    font-size: 1.125rem; font-weight: 700;
+    margin: 2rem 0 0.75rem;
+    color: white;
+  }
+  h4 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+  p { margin: 0 0 1rem; }
+  a { color: #c4b5fd; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s; }
+  a:hover { border-bottom-color: #c4b5fd; }
+  strong { color: white; }
+  ul, ol { padding-left: 1.5rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.5rem; }
+
+  /* Cards */
+  .card {
+    border-radius: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+    transition: all 0.3s;
+  }
+  .card:hover { border-color: var(--border-2); }
+  .card h3 { margin-top: 0; display: flex; align-items: center; gap: 0.75rem; }
+  .card .tag {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .card .tag.free    { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
+  .card .tag.fast    { background: rgba(6, 182, 212, 0.15);  color: #67e8f9; border-color: rgba(6, 182, 212, 0.3); }
+  .card .tag.docker  { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border-color: rgba(59, 130, 246, 0.3); }
+  .card .tag.vps     { background: rgba(245, 158, 11, 0.15); color: #fcd34d; border-color: rgba(245, 158, 11, 0.3); }
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .card-header > div:first-child { flex: 1; min-width: 0; }
+  .card-header .emoji { font-size: 1.5rem; }
+
+  /* Code blocks */
+  pre {
+    background: #0a0a14;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    position: relative;
+    margin: 0.75rem 0 1rem;
+  }
+  pre code { color: #cbd5e1; }
+  .code-kw   { color: #c084fc; }
+  .code-str  { color: #86efac; }
+  .code-com  { color: #64748b; font-style: italic; }
+  .code-flag { color: #fcd34d; }
+  .code-url  { color: #67e8f9; }
+
+  code:not(pre code) {
+    background: rgba(255,255,255,0.06);
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+    font-size: 0.88em;
+    color: #fcd34d;
+    border: 1px solid var(--border);
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.6rem; right: 0.6rem;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border-2);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+  .copy-btn.copied { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.925rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th { font-weight: 600; color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* Callouts */
+  .callout {
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    border-left: 3px solid;
+    margin: 1rem 0;
+    font-size: 0.925rem;
+  }
+  .callout.tip    { background: rgba(16, 185, 129, 0.08); border-color: var(--success); color: #a7f3d0; }
+  .callout.warn   { background: rgba(245, 158, 11, 0.08); border-color: var(--warn); color: #fde68a; }
+  .callout.danger { background: rgba(244, 63, 94, 0.08); border-color: var(--danger); color: #fecaca; }
+  .callout strong { color: inherit; display: block; margin-bottom: 0.25rem; }
+
+  /* Accordion */
+  details {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.5rem;
+    transition: background 0.2s;
+  }
+  details[open] { background: var(--card-hover); }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: white;
+    list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  summary::after {
+    content: '+';
+    font-size: 1.25rem;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+  }
+  details[open] summary::after { content: '−'; }
+  details > div { margin-top: 1rem; color: var(--text-dim); }
+
+  /* Steps */
+  ol.steps { list-style: none; padding: 0; counter-reset: step; }
+  ol.steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 3rem;
+    margin-bottom: 1.25rem;
+  }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 2rem; height: 2rem;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(6, 182, 212, 0.2));
+    border: 1px solid var(--border-2);
+    color: white;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+
+  /* Decision matrix */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+  .matrix-card {
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  .matrix-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 0.35rem; }
+  .matrix-card .answer { font-weight: 700; color: white; }
+
+  footer.site-footer {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 0.875rem;
+  }
+
+  /* Back to app button */
+  .back-link {
+    position: fixed;
+    top: 1.25rem; right: 1.25rem;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border-2);
+    backdrop-filter: blur(12px);
+    color: white;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    transition: all 0.2s;
+  }
+  .back-link:hover { background: rgba(255,255,255,0.14); border-color: rgba(168, 85, 247, 0.5); }
+
+  @media (max-width: 600px) {
+    .back-link { top: auto; bottom: 1rem; right: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<a href="/" class="back-link">← Back to app</a>
+
+<div class="wrap">
+  <header class="hero">
+    <a href="/" class="brand">
+      <div class="brand-logo font-khmer">ក</div>
+      <div class="brand-name">KhmerSub<span class="grad"> AI</span></div>
+    </a>
+    <div class="badge">🚀 Production-ready deployment guide</div>
+    <h1>Hosting <span class="grad">KhmerSub AI</span></h1>
+    <p>A complete guide to deploying KhmerSub AI on any platform — from one-click Vercel deploys to self-hosted Docker on your own VPS.</p>
+  </header>
+
+  <div class="layout">
+    <nav class="toc">
+      <h3>On this page</h3>
+      <a href="#overview">Overview</a>
+      <a href="#prerequisites">Prerequisites</a>
+      <a href="#vercel">1. Vercel + Neon</a>
+      <a href="#railway">2. Railway</a>
+      <a href="#docker">3. Docker Compose</a>
+      <a href="#fly">4. Fly.io</a>
+      <a href="#vps">5. Manual VPS</a>
+      <a href="#env">Environment variables</a>
+      <a href="#update">Updating</a>
+      <a href="#troubleshoot">Troubleshooting</a>
+      <a href="#matrix">Decision matrix</a>
+    </nav>
+
+    <main>
+      <section id="overview">
+        <h2><span class="icon">📦</span> What's inside the app</h2>
+        <div class="card">
+          <ul>
+            <li><strong>Next.js 16</strong> with App Router and React Server Components</li>
+            <li><strong>PostgreSQL</strong> via Drizzle ORM — stores translated subtitle projects</li>
+            <li><strong>In-browser Whisper</strong> (transformers.js + ONNX) — speech recognition runs entirely in the user's browser, no API keys needed</li>
+            <li><strong>Server-side translation proxy</strong> — forwards requests to Google Translate with fallback endpoints</li>
+            <li><strong>Optional cloud Whisper</strong> (Groq / OpenAI) — enabled automatically with <code>GROQ_API_KEY</code> or <code>OPENAI_API_KEY</code></li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="prerequisites">
+        <h2><span class="icon">🔑</span> Prerequisites</h2>
+        <div class="card">
+          <ol>
+            <li>A <strong>PostgreSQL database</strong> — required. Use any managed Postgres service (Neon, Supabase, Railway, Render, AWS RDS) or a local install.</li>
+            <li><strong>Node.js 20+</strong> (only if you deploy without Docker).</li>
+            <li>A <code>DATABASE_URL</code> environment variable pointing to your Postgres.</li>
+            <li><em>(Optional)</em> <code>GROQ_API_KEY</code> or <code>OPENAI_API_KEY</code> to enable cloud Whisper.</li>
+          </ol>
+          <p>Copy <code>.env.example</code> to <code>.env</code> and fill in the values:</p>
+<pre><button class="copy-btn">Copy</button><code><span class="code-kw">cp</span> .env.example .env
+<span class="code-com"># edit .env with your credentials</span></code></pre>
+        </div>
+      </section>
+
+      <section id="vercel">
+        <h2><span class="icon">▲</span> Option 1 — Vercel + Neon</h2>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3><span class="emoji">▲</span> Vercel <span class="tag free">Free</span> <span class="tag fast">5 minutes</span></h3>
+              <p>Best for <strong>quick, free, zero-ops hosting</strong>. Vercel runs Next.js natively and you pair it with a free Postgres from Neon or Supabase.</p>
+            </div>
+          </div>
+          <ol class="steps">
+            <li>
+              <strong>Create a Postgres database</strong> on <a href="https://neon.tech" target="_blank">Neon</a> (free tier, 0.5 GB) or <a href="https://supabase.com" target="_blank">Supabase</a> (free tier, 500 MB). Copy the connection string (<code>postgresql://…</code>).
+            </li>
+            <li><strong>Push this repo to GitHub/GitLab.</strong></li>
+            <li>
+              <strong>Import the project on <a href="https://vercel.com/new" target="_blank">Vercel</a>.</strong>
+              Vercel auto-detects Next.js. In the <strong>Environment Variables</strong> section add:
+              <ul>
+                <li><code>DATABASE_URL</code> = your Postgres connection string</li>
+                <li><em>(Optional)</em> <code>GROQ_API_KEY</code> or <code>OPENAI_API_KEY</code></li>
+              </ul>
+            </li>
+            <li><strong>Deploy.</strong> Vercel builds and starts the app automatically.</li>
+            <li>
+              <strong>Push the schema once.</strong> Vercel doesn't run <code>drizzle-kit push</code> automatically, so do it from your machine:
+<pre><button class="copy-btn">Copy</button><code><span class="code-com"># install locally first</span>
+<span class="code-kw">npm</span> install
+<span class="code-com"># use the same DATABASE_URL as Vercel</span>
+<span class="code-kw">export</span> DATABASE_URL=<span class="code-str">"postgresql://user:pass@host/db"</span>
+<span class="code-kw">npx</span> drizzle-kit push</code></pre>
+            </li>
+            <li><em>(Optional)</em> Add a custom domain in Vercel → Settings → Domains.</li>
+          </ol>
+          <div class="callout tip">
+            <strong>💡 Tip</strong>
+            Vercel has a free Neon integration — click "Add Postgres" on the Storage tab and Vercel wires <code>DATABASE_URL</code> for you automatically.
+          </div>
+        </div>
+      </section>
+
+      <section id="railway">
+        <h2><span class="icon">🚂</span> Option 2 — Railway</h2>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3><span class="emoji">🚂</span> Railway <span class="tag fast">One-click</span> <span class="tag docker">Managed Postgres</span></h3>
+              <p>Best for <strong>a free managed Postgres + automatic Docker builds</strong>, with a single deploy button.</p>
+            </div>
+          </div>
+          <ol class="steps">
+            <li>Sign in to <a href="https://railway.app" target="_blank">Railway</a> with GitHub.</li>
+            <li>Click <strong>New Project → Deploy from GitHub repo</strong>.</li>
+            <li>Click <strong>+ New → Database → Add PostgreSQL</strong>. Railway injects <code>DATABASE_URL</code> automatically.</li>
+            <li>In your app service → <strong>Variables</strong>, make sure <code>DATABASE_URL</code> points at the Postgres service (Railway creates a reference variable for you).</li>
+            <li>In <strong>Settings → Build</strong> the platform auto-detects Next.js.</li>
+            <li>
+              In <strong>Settings → Deploy → Custom start command</strong>, use:
+<pre><button class="copy-btn">Copy</button><code>npx drizzle-kit push &amp;&amp; npm start</code></pre>
+            </li>
+            <li>Deploy. Railway builds, pushes the schema, and serves the app.</li>
+            <li><strong>Generate a domain</strong> under Settings → Networking → Public networking.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="docker">
+        <h2><span class="icon">🐳</span> Option 3 — Docker Compose on any VPS</h2>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3><span class="emoji">🐳</span> Docker Compose <span class="tag vps">VPS</span> <span class="tag fast">$5/mo</span></h3>
+              <p>Best for <strong>full control</strong> and cheap hosting on Hetzner, DigitalOcean, OVH, or Vultr.</p>
+            </div>
+          </div>
+          <h4>Steps on your VPS</h4>
+<pre><button class="copy-btn">Copy</button><code><span class="code-com"># 1. Install Docker and Compose (Ubuntu/Debian)</span>
+<span class="code-kw">curl</span> <span class="code-flag">-fsSL</span> <span class="code-url">https://get.docker.com</span> | <span class="code-kw">sh</span>
+<span class="code-kw">sudo</span> usermod <span class="code-flag">-aG</span> docker <span class="code-str">$USER</span>
+newgrp docker
+
+<span class="code-com"># 2. Clone the project</span>
+<span class="code-kw">git</span> clone <span class="code-url">https://github.com/yourname/khmersub-ai.git</span>
+<span class="code-kw">cd</span> khmersub-ai
+
+<span class="code-com"># 3. Create your .env</span>
+<span class="code-kw">cp</span> .env.example .env
+nano .env   <span class="code-com"># fill in GROQ_API_KEY / OPENAI_API_KEY if you want</span>
+
+<span class="code-com"># 4. Build and start everything (app + PostgreSQL)</span>
+<span class="code-kw">docker</span> compose up <span class="code-flag">-d</span> <span class="code-flag">--build</span>
+
+<span class="code-com"># 5. Check logs</span>
+<span class="code-kw">docker</span> compose logs <span class="code-flag">-f</span> app</code></pre>
+          <p>The entrypoint script automatically runs <code>drizzle-kit push</code> every time the app starts, so your schema is always in sync. Visit <code>http://your-server-ip:3000</code>.</p>
+
+          <h4>Useful commands</h4>
+          <table>
+            <thead><tr><th>Action</th><th>Command</th></tr></thead>
+            <tbody>
+              <tr><td>Rebuild after code changes</td><td><code>docker compose up -d --build</code></td></tr>
+              <tr><td>Stop</td><td><code>docker compose down</code></td></tr>
+              <tr><td>View logs</td><td><code>docker compose logs -f</code></td></tr>
+              <tr><td>Backup DB</td><td><code>docker compose exec db pg_dump -U postgres khmersub &gt; backup.sql</code></td></tr>
+              <tr><td>Restore</td><td><code>docker compose exec -T db psql -U postgres khmersub &lt; backup.sql</code></td></tr>
+            </tbody>
+          </table>
+
+          <h4>Put it behind HTTPS (recommended)</h4>
+          <p>Add Caddy as a reverse proxy for auto-Let's Encrypt certs. Add this service to <code>docker-compose.yml</code>:</p>
+<pre><button class="copy-btn">Copy</button><code>caddy:
+  image: caddy:2-alpine
+  restart: unless-stopped
+  ports:
+    - <span class="code-str">"80:80"</span>
+    - <span class="code-str">"443:443"</span>
+  volumes:
+    - ./Caddyfile:/etc/caddy/Caddyfile
+    - caddy_data:/data
+  depends_on: [app]
+
+volumes:
+  pgdata:
+  caddy_data:</code></pre>
+          <p>Create a <code>Caddyfile</code>:</p>
+<pre><button class="copy-btn">Copy</button><code><span class="code-url">subtitles.yourdomain.com</span> {
+    reverse_proxy app:3000
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="fly">
+        <h2><span class="icon">🪁</span> Option 4 — Fly.io</h2>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3><span class="emoji">🪁</span> Fly.io <span class="tag fast">Global edge</span></h3>
+              <p>Best for <strong>global edge deployment</strong> with managed Postgres.</p>
+            </div>
+          </div>
+<pre><button class="copy-btn">Copy</button><code><span class="code-com"># Install flyctl</span>
+<span class="code-kw">curl</span> <span class="code-flag">-L</span> <span class="code-url">https://fly.io/install.sh</span> | <span class="code-kw">sh</span>
+fly auth login
+
+<span class="code-com"># Launch (creates a new app)</span>
+fly launch <span class="code-flag">--no-deploy</span>
+
+<span class="code-com"># Add a Postgres cluster and attach it</span>
+fly postgres create <span class="code-flag">--name</span> khmersub-db
+fly postgres attach khmersub-db
+
+<span class="code-com"># (Optional) add cloud Whisper keys</span>
+fly secrets set GROQ_API_KEY=xxx
+
+<span class="code-com"># Deploy</span>
+fly deploy</code></pre>
+        </div>
+      </section>
+
+      <section id="vps">
+        <h2><span class="icon">🖥️</span> Option 5 — Manual VPS (no Docker)</h2>
+        <div class="card">
+<pre><button class="copy-btn">Copy</button><code><span class="code-com"># 1. Install Node 20 + PostgreSQL 16 (Ubuntu/Debian)</span>
+<span class="code-kw">curl</span> <span class="code-flag">-fsSL</span> <span class="code-url">https://deb.nodesource.com/setup_20.x</span> | <span class="code-kw">sudo</span> <span class="code-flag">-E</span> bash <span class="code-flag">-</span>
+<span class="code-kw">sudo</span> apt install <span class="code-flag">-y</span> nodejs postgresql postgresql-contrib
+
+<span class="code-com"># 2. Create the database</span>
+<span class="code-kw">sudo</span> <span class="code-flag">-u</span> postgres psql &lt;&lt;<span class="code-str">SQL</span>
+CREATE USER khmersub WITH PASSWORD <span class="code-str">'choose-a-strong-password'</span>;
+CREATE DATABASE khmersub OWNER khmersub;
+SQL
+
+<span class="code-com"># 3. Clone and install</span>
+<span class="code-kw">git</span> clone <span class="code-url">https://github.com/yourname/khmersub-ai.git</span>
+<span class="code-kw">cd</span> khmersub-ai
+<span class="code-kw">npm</span> ci
+
+<span class="code-com"># 4. Environment</span>
+<span class="code-kw">cp</span> .env.example .env
+nano .env    <span class="code-com"># set DATABASE_URL=postgresql://khmersub:…@localhost:5432/khmersub</span>
+
+<span class="code-com"># 5. Push schema and build</span>
+npx drizzle-kit push
+npm run build
+
+<span class="code-com"># 6. Run with a process manager (PM2)</span>
+npm install <span class="code-flag">-g</span> pm2
+pm2 start npm <span class="code-flag">--name</span> khmersub <span class="code-flag">--</span> start
+pm2 save
+pm2 startup    <span class="code-com"># follow the command it prints</span></code></pre>
+          <p>Put it behind Nginx + Let's Encrypt (Certbot) for HTTPS.</p>
+        </div>
+      </section>
+
+      <section id="env">
+        <h2><span class="icon">⚙️</span> Environment variables</h2>
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <table>
+            <thead>
+              <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>DATABASE_URL</code></td><td>✅ Yes</td><td>PostgreSQL connection string</td></tr>
+              <tr><td><code>GROQ_API_KEY</code></td><td>❌ No</td><td>Enables fast Groq Whisper Large v3 (≤25 MB)</td></tr>
+              <tr><td><code>OPENAI_API_KEY</code></td><td>❌ No</td><td>Enables OpenAI Whisper (≤25 MB)</td></tr>
+              <tr><td><code>NODE_ENV</code></td><td>❌ No</td><td><code>production</code> (default in Docker)</td></tr>
+              <tr><td><code>PORT</code></td><td>❌ No</td><td>Defaults to <code>3000</code></td></tr>
+              <tr><td><code>HOSTNAME</code></td><td>❌ No</td><td>Defaults to <code>0.0.0.0</code> in Docker</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="update">
+        <h2><span class="icon">🔄</span> Updating the app</h2>
+        <div class="card">
+          <p>After you pull new code:</p>
+          <ul>
+            <li><strong>Vercel / Railway / Fly</strong>: just push to <code>main</code> — the platform rebuilds and redeploys.</li>
+            <li><strong>Docker</strong>: <code>git pull &amp;&amp; docker compose up -d --build</code>. The entrypoint re-pushes the schema automatically.</li>
+            <li><strong>Manual VPS</strong>:
+<pre><button class="copy-btn">Copy</button><code>git pull &amp;&amp; npm ci &amp;&amp; npx drizzle-kit push &amp;&amp; npm run build &amp;&amp; pm2 restart khmersub</code></pre>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="troubleshoot">
+        <h2><span class="icon">🛠️</span> Troubleshooting</h2>
+
+        <details>
+          <summary>"Cannot find name 'RouteContext'" type errors during build</summary>
+          <div>Run <code>npx next typegen</code> once. The project already has generated route types.</div>
+        </details>
+
+        <details>
+          <summary>Schema push fails</summary>
+          <div>Check <code>DATABASE_URL</code> is correct and the Postgres server is reachable. You can run it manually with:<br/>
+<pre><button class="copy-btn">Copy</button><code>DATABASE_URL=<span class="code-str">"…"</span> npx drizzle-kit push</code></pre>
+          </div>
+        </details>
+
+        <details>
+          <summary>Translation returns "Sorry…" / 429</summary>
+          <div>Google is rate-limiting the server IP. The app already falls back to <code>clients5.google.com</code> and then <code>mymemory.translated.net</code>. Browsers also fall back to calling Google directly, so users are rarely impacted.</div>
+        </details>
+
+        <details>
+          <summary>Whisper is slow the first time</summary>
+          <div>The speech model (75–480 MB) is downloaded once in the user's browser and cached. Subsequent visits are instant.</div>
+        </details>
+
+        <details>
+          <summary>Large audio files crash the browser</summary>
+          <div>The in-browser engine needs ~2× the decoded audio size in RAM. For files over ~30 minutes, enable the cloud engine (<code>GROQ_API_KEY</code> or <code>OPENAI_API_KEY</code>).</div>
+        </details>
+
+        <details>
+          <summary>Docker image too big</summary>
+          <div>The Dockerfile already uses Next.js <code>standalone</code> output, so the final image is ~200 MB.</div>
+        </details>
+      </section>
+
+      <section id="matrix">
+        <h2><span class="icon">🧭</span> Quick decision matrix</h2>
+        <div class="matrix">
+          <div class="matrix-card">
+            <div class="label">I want to try it, fast</div>
+            <div class="answer">▲ Vercel + Neon</div>
+          </div>
+          <div class="matrix-card">
+            <div class="label">I want everything managed</div>
+            <div class="answer">🚂 Railway</div>
+          </div>
+          <div class="matrix-card">
+            <div class="label">I want cheap &amp; full control</div>
+            <div class="answer">🐳 Docker Compose on a VPS</div>
+          </div>
+          <div class="matrix-card">
+            <div class="label">I want global edge</div>
+            <div class="answer">🪁 Fly.io</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <p>KhmerSub AI · <span class="font-khmer">សូមអរគុណ</span> · That's it — the app works everywhere Node 20 + Postgres run.</p>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+  // Copy-to-clipboard for code blocks
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const code = btn.parentElement.querySelector('code');
+      const text = code.innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 1800);
+      } catch {
+        btn.textContent = 'Failed';
+      }
+    });
+  });
+
+  // Active TOC link on scroll
+  const tocLinks = document.querySelectorAll('.toc a');
+  const sections = Array.from(tocLinks).map(a => document.querySelector(a.getAttribute('href')));
+
+  function updateToc() {
+    const scrollY = window.scrollY + 120;
+    let current = 0;
+    sections.forEach((sec, i) => {
+      if (sec && sec.offsetTop <= scrollY) current = i;
+    });
+    tocLinks.forEach((a, i) => a.classList.toggle('active', i === current));
+  }
+  window.addEventListener('scroll', updateToc, { passive: true });
+  updateToc();
+</script>
+</body>
+</html>

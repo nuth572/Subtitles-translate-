@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KhmerSub AI — Opening…</title>
+<meta http-equiv="refresh" content="0; url=index.html" />
+<link rel="canonical" href="index.html" />
+<meta name="description" content="Turn any audio/video into Khmer subtitles, or translate any SRT/VTT into Khmer. Pure HTML — no install, no server." />
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: #06060f;
+    color: #e2e8f0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .box { text-align: center; }
+  .logo {
+    width: 72px; height: 72px;
+    margin: 0 auto 1.25rem;
+    border-radius: 22px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6, #06b6d4);
+    font-family: 'Kantumruy Pro', 'Noto Sans Khmer', sans-serif;
+    font-weight: 700; font-size: 2.25rem; color: #fff;
+    box-shadow: 0 16px 50px rgba(139, 92, 246, 0.5);
+  }
+  h1 { font-size: 1.375rem; font-weight: 800; margin: 0 0 0.5rem; }
+  p { color: #94a3b8; font-size: 0.9375rem; margin: 0 0 1.5rem; }
+  a.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #06b6d4);
+    color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9375rem;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.35);
+  }
+  a.btn:hover { filter: brightness(1.12); }
+  .spinner {
+    display: inline-block; width: 1.1em; height: 1.1em;
+    border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -0.15em;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Kantumruy+Pro:wght@700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="box">
+    <div class="logo">ក</div>
+    <h1>Opening KhmerSub AI…</h1>
+    <p><span class="spinner"></span> Redirecting to the app</p>
+    <a class="btn" href="index.html">Open the app →</a>
+  </div>
+  <script>
+    // Fallback if meta refresh is blocked
+    window.location.replace('index.html');
+  </script>
+</body>
+</html>
